@@ -1,0 +1,34 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the vSite Baackup module.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+//function vsite_backup_install() {
+//  // vsite_backup_schema() will be processed automatically before this is called.
+//}
+
+/**
+ * Implements hook_enable().
+ */
+//function vsite_backup_enable() {
+//
+//}
+
+/**
+ * Implements hook_schema().
+ */
+//function vsite_backup_schema() {
+//
+//}
+
+/**
+ * Implements hook_update_N().
+ */
+//function vsite_backup_update_7001(&$sandbox) {
+//
+//}
