@@ -61,16 +61,8 @@ function vsite_export_get_vsite_exportables($vsite = NULL) {
 
   }
 
-
-  // Get Vsite GID/NID.
-  $gid = $og_context['gid'];
-
-
-  // Entity types used by OG.
+  // Obtain entity types used by OG.
   $vsite_entity_types = og_get_all_group_content_entity();
-
-  dpm('og get all group content entity');
-  dpm($vsite_entity_types);
 
   // Get Vsite Node and Group Context
   $gid = $og_context['gid'];
@@ -94,8 +86,6 @@ function vsite_export_get_vsite_exportables($vsite = NULL) {
     foreach ($og_contents as $k => $v) {
      $exportables[$key][] = array('entity_type' => $v->entity_type, 'group_type' => $v->type, 'entity_id' => $v->etid);
     }
-    dpm('group : ' . $key);
-    dpm($exportables);
 
   }
 
