@@ -35,8 +35,121 @@
  API
 ******************************************************************************/
 
+/**
+ * Function to return exportables related to a Vsite.
+ *
+ *
+ *
+ */
+function vsite_export_get_vsite_exportables($vsite = NULL) {
+
+  // If Vsite context is supplied, set it.
+  if (isset($vsite)) {
+
+    if (is_numeric($vsite)) { // NID
+      $og_context = og_context('node', node_load($vsite));
+    }
+    else { // Node object
+      $og_context = og_context('node', node_load($vsite->nid));
+    }
+
+  }
+  // No Vsite context supplied, get it.
+  else {
+
+    $og_context = og_context();
+
+  }
+
+
+  // Get Vsite GID/NID.
+  $gid = $og_context['gid'];
+
+
+  // Entity types used by OG.
+  $vsite_entity_types = og_get_all_group_content_entity();
+
+  dpm('og get all group content entity');
+  dpm($vsite_entity_types);
+
+  // Get Vsite Node and Group Context
+  $gid = $og_context['gid'];
+  $nid = $gid;
+
+  $exportables = array();
+
+  // Set Vsite node as first in array.
+  // TODO Use according to Hoyle group_type name here.
+  $exportables['vsite'] = array('entity_type' => 'node', 'group_type' => 'vsite node', 'nid' => $nid);
+
+  foreach ($vsite_entity_types as $key => $value) {
+
+    // Get Nodes
+    $og_contents = db_select('og_membership', 'ogm')
+      ->fields('ogm', array('etid', 'type', 'entity_type'))
+      ->condition('ogm.gid', $gid, '=')
+      ->condition('ogm.entity_type', $key, '=') // 'node'
+      ->execute()->fetchAll();
+
+    foreach ($og_contents as $k => $v) {
+     $exportables[$key][] = array('entity_type' => $v->entity_type, 'group_type' => $v->type, 'entity_id' => $v->etid);
+    }
+    dpm('group : ' . $key);
+    dpm($exportables);
+
+  }
+
+  // TODO Registrations not getting pulled in?
+  // TODO How about feeds? importers?
+
+// separate function?
+  // TODO Taxonomy vocabulary - get whole vocab, vid and machine name... per Vsite.
+  // TODO Taxonomy vid for global organizations vocabulary
+
+// separate function?
+  // TODO Contents of spaces_overrides table.
+
+  // TODO Roles
+  // TODO User's roles.
+
+
+  return $exportables;
+}
+
+
+
 /*****************************************************************************
  DEVELOPER NOTES
 ******************************************************************************/
 
+// TODO process exportables into RESTFUL representations
 
+// TODO function to queue response from vsite_export_get_vsite_exportables() into cron under the vsite
+
+// TODO Cron processing of queue.
+  // TODO secure download build location.
+  // TODO processing - streaming to JSON
+    // TODO Library module?
+  // TODO processing - streaming to XML
+    // TODO Library module?
+  // TODO saving files.
+
+
+/* Collect and Return
+X Vsite node
+x Users and their url aliases
+x All nodes associated with site and their url aliases
+x All files associated with site
+All vocabs and taxonomy terms for a site and their url aliases
+Vocabulary ID of the global Organizations vocabulary
+Contents of spaces_overrides table for the site
+Feed Importers (used to create feed items, and shown in the news import interface)
+Permission sets for all roles, custom or not
+Which users get which roles
+*/
+
+// Get Users -- Keeping this. We may want to use this anyway, as it allows for
+// filtering based on OG membership state: To obtain only active, pending or
+// blocked users, you can put 'members__1', 'members__2' or 'members__3' in
+// place of 'members', like in this example:
+//$uids = og_get_group_members_properties($vsite_node, array(), 'members__' . OG_STATE_ACTIVE, 'node'); // Only active users.
