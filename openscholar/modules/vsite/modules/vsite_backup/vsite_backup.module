@@ -10,11 +10,39 @@
  *
  */
 
-
 /*****************************************************************************
  HOOKS
 ******************************************************************************/
+function vsite_backup_os_restful_cp_menu_admin_panel_alter(&$menu){
+  $menu['vsite_backup'] = array(
+    'label' => 'Backup',
+    'type' => 'link',
+    'href' => 'vsite-backup',
+    'access' => TRUE,
+  );
+}
+function vsite_backup_menu()
+{
+  $items['vsite-backup'] = array(
+    'title' => t('Vsite Backup'),
+    'description' => 'Vsite vackup.',
+    'page callback' => 'vsite_backup_admin',
+    'access callback' => 'vsite_backup_admin_access',
+    'weight' => 50,
+    'menu_name' => 'cp',
+  );
 
+  return $items;
+}
+
+function vsite_backup_permission() {
+  return array(
+    'administer vsite backup' => array(
+      'title' => t('Administer Vsite Backup'),
+      'description' => t('Access Vsite Backup admin pages.'),
+    ),
+  );
+}
 /*****************************************************************************
  CALLBACKS
 ******************************************************************************/
