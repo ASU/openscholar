@@ -5,3 +5,4 @@ package = "OpenScholar vsite"
 php = "5.2.4"
 dependencies[] = ctools
 dependencies[] = vsite
+dependencies[] = vsite_backup
