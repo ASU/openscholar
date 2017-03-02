@@ -95,6 +95,12 @@ function vsite_export_get_vsite_exportables($vsite = NULL) {
 // separate function?
   // TODO Taxonomy vocabulary - get whole vocab, vid and machine name... per Vsite.
   // TODO Taxonomy vid for global organizations vocabulary
+  if (module_exists('og_vocab')) {
+    $group_vocabs = og_vocab_relation_get_by_group('node', $gid);
+    foreach ($group_vocabs as $vk => $vv) {
+      $exportables['taxonomy'][] = array('group_type' => $vv->group_type, 'gid' => $vv->gid, 'vid' => $vv->vid);
+    }
+  }
 
 // separate function?
   // TODO Contents of spaces_overrides table.
@@ -112,15 +118,16 @@ function vsite_export_get_vsite_exportables($vsite = NULL) {
  DEVELOPER NOTES
 ******************************************************************************/
 
-// TODO process exportables into RESTFUL representations
+// TODO UUID ?????????
 
 // TODO function to queue response from vsite_export_get_vsite_exportables() into cron under the vsite
 
 // TODO Cron processing of queue.
   // TODO secure download build location.
-  // TODO processing - streaming to JSON
+  // TODO process exportables from queue into RESTFUL representations
+  // TODO stream to JSON
     // TODO Library module?
-  // TODO processing - streaming to XML
+  // TODO stream to XML
     // TODO Library module?
   // TODO saving files.
 
