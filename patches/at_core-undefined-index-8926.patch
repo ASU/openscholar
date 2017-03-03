@@ -1,0 +1,13 @@
+diff --git a/openscholar/themes/adaptivetheme/at_core/inc/load.inc b/openscholar/themes/adaptivetheme/at_core/inc/load.inc
+index 42df85b..ad26e50 100755
+--- a/openscholar/themes/adaptivetheme/at_core/inc/load.inc
++++ b/openscholar/themes/adaptivetheme/at_core/inc/load.inc
+@@ -593,7 +593,7 @@ function polly_wants_a_cracker($polly, $theme_name) {
+             );
+           }
+         }
+-        if ($crackers['ie']) {
++        if (isset($crackers['ie'])) {
+           $baked_crackers = $crackers['ie'];
+         }
+       }
