@@ -89,7 +89,8 @@ function vsite_export_get_vsite_exportables($vsite = NULL) {
 
   }
 
-  // TODO Registrations not getting pulled in?
+  // TODO Registrations not getting pulled in?  - Per requirements, not needed.
+
   // TODO How about feeds? importers?
 
 // separate function?
@@ -108,6 +109,37 @@ function vsite_export_get_vsite_exportables($vsite = NULL) {
   // TODO Roles
   // TODO User's roles.
 
+
+  // TODO TOKENIZE IDs so referential entities can be re-mapped together at import.
+    // {vsite_backup_mappings}
+    // - entity type
+    // - entity bundle
+    // - entity original id
+    // - New id
+
+  // EXPORTABLES ARRAY
+  // vsite
+  // node
+  // file
+  // user
+  // taxonomy
+
+// global_org_taxonomy - Vocabulary ID of the global Organizations vocabulary
+// spaces_overrides table for the site - select * from spaces_overrides where id = <vsite nid>;
+// global_user_roles
+// user_og_roles
+// vsite_layout_block - select * from vsite_layout_block_table where sid = <vsite nid>;
+// biblio_contributors - just let them be created during node save if they do not exist
+// field_collections - Field Collections - think field_department_school is the only one
+//  - check for field collections to export
+//  - do from export submit? or process during a swipe through cron? tokenized keys will count here
+// DELAY: feed_importers - Feed Importers (used to create feed items, and shown in the news import interface)
+// DELAY: Redirects - We will need to copy over redirect entries?
+//    - Redirects: I don't know. We should ask the clients.
+
+
+// GATHER DURING CRON:
+//URL aliases for nodes, vocabs/terms and users
 
   return $exportables;
 }
@@ -140,9 +172,59 @@ x All files associated with site
 All vocabs and taxonomy terms for a site and their url aliases
 Vocabulary ID of the global Organizations vocabulary
 Contents of spaces_overrides table for the site
+  - select * from spaces_overrides where id = <vsite nid>;
 Feed Importers (used to create feed items, and shown in the news import interface)
 Permission sets for all roles, custom or not
 Which users get which roles
+
+
+EXTRAS to collect and return
+
+vsite_layout_block table
+  - NIX There is no vsite_layout_block table. It's stored in spaces_overrides. ... table exists?
+  - select * from vsite_layout_block_table where sid = <vsite nid>;
+
+biblio_contributors - just let them be created during node save if they do not exist
+
+URL aliases for nodes, vocabs/terms and users
+
+Field Collections - think field_department_school is the only one
+  - check for field collections to export
+  - do from export submit? or process during a swipe through cron? tokenized keys will count here
+
+Feed Importers and Feed Items.... Do we need these? I think the feed items can def be skipped and maybe the feed importers as well.
+Feed Importers and Feed Items: I think people will expect them to be included, and would want them so they can layout their site accurately.
+
+- HOLD - Redirects - We will need to copy over redirect entries?
+  - Redirects: I don't know. We should ask the clients.
+
+X Event Registration Information
+  - Event Registration: No. There's really no need, and it would cause registrants to receive multiple e-mails.
+
+
+X - I say we throw away all revision info
+  - revision info: We don't keep it anyway, do we?
+
+X - I say we throw away all drupal comments
+  - comments: I don't think anyone uses it, but yes, toss it.
+
+
+
+RESTFUL:
+
+Using programmatically: https://github.com/RESTful-Drupal/restful/wiki/Using-the-API-within-Drupal
+
+$handler = restful()
+  ->getResourceManager()
+  ->getPlugin('pictures:1.0');
+
+$get_result = restful()
+  ->getFormatterManager()
+  ->format($handler->doGet());
+
+$result = json_decode($get_result);
+
+
 */
 
 // Get Users -- Keeping this. We may want to use this anyway, as it allows for
