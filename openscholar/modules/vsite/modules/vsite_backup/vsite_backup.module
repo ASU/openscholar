@@ -10,9 +10,19 @@
  *
  */
 
+define('VSITE_BACKUP_EXPORT_STATUS_IN_PROGRESS', 'in progress');
+define('VSITE_BACKUP_EXPORT_STATUS_COMPLETE', 'complete');
+define('VSITE_BACKUP_EXPORT_FINALIZE', 'finalize');
+
 /*****************************************************************************
  HOOKS
 ******************************************************************************/
+
+/**
+ * Implements hook_os_restful_cp_menu_admin_panel_alter().
+ *
+ * @param $menu
+ */
 function vsite_backup_os_restful_cp_menu_admin_panel_alter(&$menu){
 
   $permitted = vsite_backup_page_access();
@@ -24,6 +34,12 @@ function vsite_backup_os_restful_cp_menu_admin_panel_alter(&$menu){
     'access' => $permitted,
   );
 }
+
+/**
+ * Implements hook_menu().
+ *
+ * @return mixed
+ */
 function vsite_backup_menu()
 {
 
@@ -42,6 +58,11 @@ function vsite_backup_menu()
   return $items;
 }
 
+/**
+ * Implements hook_permission().
+ *
+ * @return array
+ */
 function vsite_backup_permission() {
   return array(
     'administer vsite backup' => array(
@@ -50,6 +71,35 @@ function vsite_backup_permission() {
     ),
   );
 }
+
+/**
+ * Implements hook_cron().
+ *
+ */
+function vsite_backup_cron() {
+
+
+}
+
+/**
+ * Implements hook_cron_queue_info().
+ *
+ * @return mixed
+ */
+function vsite_backup_cron_queue_info() {
+
+  // All exports run in a single queue. Each queue entry comes with an eid
+  // (export id) and the vsite_id for reference. eid is derrived from export
+  // tracking table {vsite_backup_exports}.
+
+  $queues['vsite_export'] = array (
+    'worker callback' => 'vsite_backup_write_export_item',
+    'time' => 180,    // Time, in seconds, to let this process run [Optional]
+  );
+
+  return $queues;
+}
+
 /*****************************************************************************
  CALLBACKS
 ******************************************************************************/
@@ -64,6 +114,18 @@ function vsite_backup_page_access(){
  FORMS
 ******************************************************************************/
 
+// TODO Vsite backup form
+
+// TODO Vsite backup form validation function
+// query {vsite_backup_exports} for count of # of exports for this vsite.
+// if limit exceeded, display
+// OR display on form that limit is exceeded, and that proceeding will result
+// in the oldest export being deleted.
+
+// TODO Vsite backup form submit calls vsite_backup_create_vsite_export_queue($vsite_id)
+
+
+
 /*****************************************************************************
  INTERNAL
 ******************************************************************************/
@@ -73,6 +135,111 @@ function vsite_backup_admin() {
   $build = vsite_backup_page($vsite->id);
   return $build;
 }
+/**
+ * Internal utility function to create a vsite export queue.
+ *
+ * @param $vsite_id
+ */
+function vsite_backup_create_vsite_export_queue($vsite_id) {
+
+  // Is there an export already in progress for this vsite?
+  $result = db_select('vsite_backup_exports', 'e')
+    ->fields('e')
+    ->condition('vsite_id', $vsite_id,'=')
+    ->condition('status', VSITE_BACKUP_EXPORT_STATUS_IN_PROGRESS,'=')
+    ->execute()
+    ->fetchAssoc();
+
+  if ($result) { // If yes...
+
+    $eid = reset($result);
+    drupal_set_message(t("An export is already in progress for this site using export ID @eid.", array('@eid' => $eid)));
+    // Exit.
+    return;
+  }
+  else { // If no vsite export in progress, insert new  export record.
+
+    global $user;
+    $uid = $user->uid;
+
+    $eid = db_insert('vsite_backup_exports')
+      ->fields(array(
+        'vsite_id' => $vsite_id,
+        'status' => VSITE_BACKUP_EXPORT_STATUS_IN_PROGRESS,
+        //'fid' => 0,
+        'uid' => $uid,
+        'created' => REQUEST_TIME,
+        //'completed' => 0,
+      ))
+      ->execute();
+
+    drupal_set_message(t("Export queued for site. Reference ID: @eid.", array('@eid' => $eid)));
+  }
+
+  // Get vsite exportables for cron queue.
+  $exportables = vsite_export_get_vsite_exportables($vsite_id);
+
+  $queue = DrupalQueue::get("vsite_export");
+  foreach ($exportables as $item_type => $item_entries) {
+
+    foreach ($item_entries as $item) {
+      $queue->createItem(array(
+        'eid' => $eid,
+        'vsite_id' => $vsite_id,
+        'item_type' => $item_type,
+        'item' => $item
+      ));
+    }
+
+  }
+  // Final item, used to trigger packaging.
+  $queue->createItem(array('eid' => $eid, 'vsite_id' => $vsite_id, 'item_type' => VSITE_BACKUP_EXPORT_FINALIZE, 'item' => ''));
+}
+
+/**
+ * Internal function used in vsite_backup_cron_queue_info().
+ *
+ * @param $data
+ */
+function vsite_backup_write_export_item($data) {
+
+
+  watchdog('vsite queue item', var_export($data, 1));
+
+
+  // TODO item prepare routine(s)
+  // call dispatch function for prepare item routines
+  // get RESTful represenation
+  // include drupal hooks
+
+  // TODO item writing routines
+  // Does an existing export file exist?
+  // Write item to json file
+  // or copy files.
+  // include drupal hooks
+
+
+  // Final record? If yes, time to package.
+  if ($data['item_type'] == VSITE_BACKUP_EXPORT_FINALIZE) {
+
+
+    // TODO Do packaging routines. Get $fid
+
+
+    $num_updated = db_update('vsite_backup_exports')
+      ->fields(array(
+        'status' => VSITE_BACKUP_EXPORT_STATUS_COMPLETE,
+        // TODO Add value for $fid
+        //'fid' => 0,
+        'completed' => REQUEST_TIME,
+      ))
+      ->condition('eid', $data['eid'])
+      //->condition('vsite_id', $data['vsite_id'])
+      ->execute();
+  }
+
+}
+
 /*****************************************************************************
  THEME
 ******************************************************************************/
@@ -97,3 +264,26 @@ function vsite_backup_page($gid){
 ******************************************************************************/
 
 
+// TODO backup files to be stored as Drupal {file_managed} files... How to secure access?
+
+/*
+
+JSON writes and avoiding memory limits? CSV recommended. Not our requirement here.
+- https://stackoverflow.com/questions/39927489/php-how-to-append-to-a-json-file
+
+A way to write to existing JSON file. Would require update if structure changed.
+- https://stackoverflow.com/questions/15149331/how-to-add-to-json-array-in-json-file-with-php
+
+How-To
+
+$handle = fopen($jsonFile);
+fseek($handle,-1,SEEK_END);
+// json_encode(array(item_type => 'blah', 'item_data' => ....))
+fwrite($handle,$arrayToAdd);
+fclose($handle);
+
+
+
+ *
+ *
+ */

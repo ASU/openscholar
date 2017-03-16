@@ -49,7 +49,7 @@ function vsite_export_get_group_content($og_context = NULL) {
   $exportables = array();
 
   // Set Vsite node as first in array.
-  $exportables['vsite'] = array('entity_type' => 'node', 'group_type' => 'vsite node', 'nid' => $nid);
+  $exportables['vsite'][] = array('entity_type' => 'node', 'group_type' => 'vsite node', 'nid' => $nid);
 
   foreach ($vsite_entity_types as $key => $value) {
 
@@ -108,7 +108,7 @@ function vsite_export_get_global_org_taxonomy($og_context = NULL) {
 
   $name = VSITE_EXPORT_ORG_TAXONOMY_MACHINE_NAME;
 
-  $exportables['global_org_taxonomy'] = (array) taxonomy_vocabulary_machine_name_load($name);
+  $exportables['global_org_taxonomy'][] = (array) taxonomy_vocabulary_machine_name_load($name);
 
   return $exportables;
 }
@@ -134,9 +134,9 @@ function vsite_export_get_group_spaces_overrides($og_context = NULL) {
   // select * from spaces_overrides where id = <vsite nid>;
   $results = db_query("SELECT * FROM {spaces_overrides} WHERE id  = :vsite_id", array(':vsite_id' => $vsite_id));
 
-  // TODO do we run the risk of maxing out based on full query here?
+  // TODO Do we run the risk of maxing out based on full query here?
   foreach ($results as $key => $value) {
-    $exportables['spaces_overrides'][] = $value;
+    $exportables['spaces_overrides'][] = (array) $value;
   }
 
   return $exportables;
@@ -154,7 +154,8 @@ function vsite_export_get_global_user_roles($og_context = NULL) {
 
   $exportables = array();
 
-  $exportables['global_user_roles'] = user_roles($membersonly = TRUE, $permission = NULL);
+  // All global roles will be processed in a single queue item.
+  $exportables['global_user_roles'][] = user_roles($membersonly = TRUE, $permission = NULL);
 
   return $exportables;
 }
@@ -177,7 +178,8 @@ function vsite_export_get_group_user_roles($og_context = NULL) {
   $vsite = node_load($vsite_id);
 
   // Entries from {og_roles} for our specific group type/bundle.
-  $exportables['group_user_roles'] = og_roles($group_type = 'node', $bundle = $vsite->type, $gid, $force_group = FALSE, $include_all = TRUE);
+  // All group roles will be processed in a single queue item.
+  $exportables['group_user_roles'][] = og_roles($group_type = 'node', $bundle = $vsite->type, $gid, $force_group = FALSE, $include_all = TRUE);
 
   return $exportables;
 }
@@ -201,7 +203,7 @@ function vsite_export_get_vsite_layout_blocks($og_context = NULL) {
   // select * from vsite_layout_block where sid = <vsite nid>;
   $results = db_query("SELECT * FROM {vsite_layout_block} WHERE sid  = :vsite_id", array(':vsite_id' => $vsite_id));
 
-  // TODO do we run the risk of maxing out based on full query here?
+  // TODO Do we run the risk of maxing out based on full query here?
   foreach ($results as $key => $value) {
     $exportables['vsite_layout_blocks'][] = (array) $value;
   }
@@ -302,9 +304,9 @@ function vsite_export_get_vsite_exportables($vsite = NULL) {
   // [vsite_layout_blocks]
   $exportables += vsite_export_get_vsite_layout_blocks($og_context);
   // [biblio_contributors]
-  $exportables += vsite_export_get_group_biblio_contributors($og_context);
+  //$exportables += vsite_export_get_group_biblio_contributors($og_context);
   // [field_collections]
-  $exportables += vsite_export_get_group_field_collections($og_context);
+  //$exportables += vsite_export_get_group_field_collections($og_context);
 
 // DELAYED: vsite_export_get_group_feed_importers()
   // [feed_importers] - Feed Importers (used to create feed items, and shown in the news import interface)
@@ -339,9 +341,7 @@ function vsite_export_get_vsite_exportables($vsite = NULL) {
 // 3. Streaming (cron process 2: stream to .json file and/or copy file)
 // 4. Completion (queue is depleted)
 
-// TODO UUID ?????????
 
-// TODO function to queue response from vsite_export_get_vsite_exportables() into cron under the vsite
 
 // TODO Cron processing of queue.
   // TODO secure download build location.

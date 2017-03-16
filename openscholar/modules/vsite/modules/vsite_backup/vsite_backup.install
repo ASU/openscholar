@@ -6,25 +6,146 @@
  */
 
 /**
- * Implements hook_schema().
+ * Implements hook_install().
  */
-//function vsite_backup_install() {
-//  // vsite_backup_schema() will be processed automatically before this is called.
-//}
+function vsite_backup_install() {
+  // vsite_backup_schema() will be processed automatically before this is called.
+}
 
 /**
  * Implements hook_enable().
  */
-//function vsite_backup_enable() {
-//
-//}
+function vsite_backup_enable() {
+
+}
 
 /**
  * Implements hook_schema().
  */
-//function vsite_backup_schema() {
-//
-//}
+function vsite_backup_schema() {
+
+  $schema['vsite_backup_exports'] = array(
+    // Example (partial) specification for table "node".
+    'description' => 'Tracking vsite exports.',
+    'fields' => array(
+      'eid' => array(
+        'description' => 'Export ID',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'vsite_id' => array(
+        'description' => 'Vsite ID / gid, for reference if og_context is needed during processing.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'status' => array(
+        'description' => 'Export status',
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'fid' => array(
+        'description' => 'Drupal File ID',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+      ),
+      'uid' => array(
+        'description' => 'Requesting user ID',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'created' => array(
+        'description' => 'Created timestamp.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        //'default' => 0,
+      ),
+      'completed' => array(
+        'description' => 'Export built and completed timestamp.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+        //'default' => 0,
+      ),
+    ),
+    //'indexes' => array(
+    //  'export_created' => array('created'),
+    //  'export_completed' => array('completed'),
+    //),
+    //'unique keys' => array(
+    //  'nid_vid' => array('nid', 'vid'),
+    //  'vid' => array('vid'),
+    //),
+    // For documentation purposes only; foreign keys are not created in the
+    // database.
+    'foreign keys' => array(
+      'uid' => array(
+        'table' => 'users',
+        'columns' => array('uid' => 'uid'),
+      ),
+      'fid' => array(
+        'table' => 'file_managed',
+        'columns' => array('fid' => 'fid'),
+      ),
+    ),
+    'primary key' => array('eid'),
+  );
+
+  /* We don't need this table, we can use the cron queue to store this data.
+  $schema['vsite_backup_export_items'] = array(
+    // Example (partial) specification for table "node".
+    'description' => 'Vsite expot item table',
+    'fields' => array(
+      'eid' => array(
+        'description' => 'Export ID',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'item_id' => array(
+        'description' => 'ID of an individual import item.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'item_type' => array(
+        'description' => 'The type of item, as per vsite_export_get_vsite_exportables().',
+        'type' => 'varchar',
+        'length' => 64,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'data' => array(
+        'description' => 'Serialized export data.',
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        ),
+    ),
+    // For documentation purposes only; foreign keys are not created in the
+    // database.
+    'foreign keys' => array(
+      'eid' => array(
+        'table' => 'vsite_backup_exports',
+        'columns' => array('eid' => 'eid'),
+      ),
+    ),
+    'primary key' => array('item_id'),
+  );
+  */
+
+
+  return $schema;
+
+
+
+}
 
 /**
  * Implements hook_update_N().
