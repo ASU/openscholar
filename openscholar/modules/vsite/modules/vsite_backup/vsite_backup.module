@@ -14,22 +14,29 @@
  HOOKS
 ******************************************************************************/
 function vsite_backup_os_restful_cp_menu_admin_panel_alter(&$menu){
+
+  $permitted = vsite_backup_page_access();
+
   $menu['vsite_backup'] = array(
     'label' => 'Backup',
     'type' => 'link',
     'href' => 'vsite-backup',
-    'access' => TRUE,
+    'access' => $permitted,
   );
 }
 function vsite_backup_menu()
 {
+
+  $permitted = vsite_backup_page_access();
+
   $items['vsite-backup'] = array(
     'title' => t('Vsite Backup'),
     'description' => 'Vsite vackup.',
     'page callback' => 'vsite_backup_admin',
-    'access callback' => 'vsite_backup_admin_access',
+    'access arguments' => array('administer vsite backup'),
+    'file' => 'vsite_backup.pages.inc',
     'weight' => 50,
-    'menu_name' => 'cp',
+    'menu_name' => 'vb',
   );
 
   return $items;
@@ -46,7 +53,13 @@ function vsite_backup_permission() {
 /*****************************************************************************
  CALLBACKS
 ******************************************************************************/
-
+function vsite_backup_page_access(){
+  if(user_access('administer vsite backup')){
+    return TRUE;
+  } else {
+    return FALSE;
+  }
+}
 /*****************************************************************************
  FORMS
 ******************************************************************************/
@@ -54,11 +67,27 @@ function vsite_backup_permission() {
 /*****************************************************************************
  INTERNAL
 ******************************************************************************/
+function vsite_backup_admin() {
+  $vsite = spaces_get_space();
 
+  $build = vsite_backup_page($vsite->id);
+  return $build;
+}
 /*****************************************************************************
  THEME
 ******************************************************************************/
+function vsite_backup_page($gid){
 
+  $build = array(
+    'content' => array(
+      'text' => array(
+        '#markup' => 'This is a test' . $gid ,
+      ),
+    ),
+  );
+
+  return $build;
+}
 /*****************************************************************************
  API
 ******************************************************************************/
