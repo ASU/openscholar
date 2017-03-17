@@ -43,14 +43,12 @@ function vsite_backup_os_restful_cp_menu_admin_panel_alter(&$menu){
 function vsite_backup_menu()
 {
 
-  $permitted = vsite_backup_page_access();
-
   $items['vsite-backup'] = array(
     'title' => t('Vsite Backup'),
     'description' => 'Vsite vackup.',
-    'page callback' => 'vsite_backup_admin',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('vsite_backup_form'),
     'access arguments' => array('administer vsite backup'),
-    'file' => 'vsite_backup.pages.inc',
     'weight' => 50,
     'menu_name' => 'vb',
   );
@@ -129,12 +127,6 @@ function vsite_backup_page_access(){
 /*****************************************************************************
  INTERNAL
 ******************************************************************************/
-function vsite_backup_admin() {
-  $vsite = spaces_get_space();
-
-  $build = vsite_backup_page($vsite->id);
-  return $build;
-}
 /**
  * Internal utility function to create a vsite export queue.
  *
@@ -197,6 +189,51 @@ function vsite_backup_create_vsite_export_queue($vsite_id) {
 }
 
 /**
+ * Query for an array of Vsite export data
+ * @param $gid
+ * @return int
+ */
+function vsite_backup_count_exports($gid){
+  $result = db_query("SELECT * FROM {vsite_backup_exports} e WHERE e.vsite_id = :gid AND e.status = 'complete'", array(':gid' => $gid));
+  $count = 0;
+
+  foreach($result as $record){
+    $count++;
+  }
+
+  return $count;
+}
+
+/**
+ * Check to see whether a backup is already in progress
+ * @param $gid
+ * @return int
+ */
+function vsite_backup_count_in_progress($gid){
+  $result = db_query("SELECT * FROM {vsite_backup_exports} e WHERE e.vsite_id = :gid AND e.status = 'in progress'", array(':gid' => $gid));
+
+  $count = 0;
+
+  foreach($result as $record){
+    $count++;
+  }
+
+  return $count;
+}
+
+//TODO Complete the delete functionality
+/**
+ * Remove extra backups after verifying non-conflicts with in-progress backups
+ * @param $gid
+ */
+function vsite_backup_equalize($gid){
+  $count = vsite_backup_count_exports($gid);
+  if($count >= 3){
+    dpm('Should be equalizing');
+  }
+}
+
+/**
  * Internal function used in vsite_backup_cron_queue_info().
  *
  * @param $data
@@ -243,17 +280,33 @@ function vsite_backup_write_export_item($data) {
 /*****************************************************************************
  THEME
 ******************************************************************************/
-function vsite_backup_page($gid){
+function vsite_backup_form($form, &$form_state){
+  $vsite = og_context();
+  $count = vsite_backup_count_exports($vsite['gid']);
+  if($count >= 3){
+    drupal_set_message(t('A site can not have more than 3 backups at a time and further backups will cause the oldest ones to be deleted. If you would like to save older backups please download them.'), 'status');
+  }
 
-  $build = array(
-    'content' => array(
-      'text' => array(
-        '#markup' => 'This is a test' . $gid ,
-      ),
-    ),
+  $form['description'] = array(
+    '#type' => 'item',
+    '#title' => t('Manage site backups'),
   );
 
-  return $build;
+  $form['export'] = array
+  (
+    '#type' => 'submit',
+    '#value' => t('Export'),
+    '#submit' => array('vsite_backup_export'),
+  );
+
+  return $form;
+}
+
+function vsite_backup_export($form, &$form_state){
+  $vsite_id = og_context();
+  drupal_set_message('Your site has been queued for backup.', 'status');
+  vsite_backup_create_vsite_export_queue($vsite_id['gid']);
+  vsite_backup_equalize($vsite_id['gid']);
 }
 /*****************************************************************************
  API
