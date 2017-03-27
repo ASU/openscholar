@@ -9,6 +9,37 @@ class VsiteExportRestfulLayout extends \VsiteExportRestfulSpaces {
 
   protected $validateHandler = 'layouts';
   protected $objectType = 'context';
+  /**
+   * Overrides \RestfulBase::controllersInfo().
+   */
+//  public static function controllersInfo() {
+//    return array(
+//      '' => array(
+//        // If they don't pass a menu-id then display nothing.
+//        \RestfulInterface::GET => 'getLayout',
+//      ),
+//    );
+//  }
+
+  /**
+   *  Get the vsite and its associated pages.
+   *
+   * @param integer $vsite_id
+   * @return array
+   */
+//  public function getLayout($vid) {
+//
+//    $output = array();
+//
+//    if (module_exists('vsite') && $vsite = vsite_get_vsite($this->request['vsite'])) {
+//      spaces_set_space($vsite);
+//      $vsite->activate_user_roles();
+//      $vsite->init_overrides();
+//      array_push($output, $vsite);
+//    }
+//
+//    return $output;
+//  }
 
   /**
    * Verify the user have access to the manage layout.
@@ -127,4 +158,30 @@ class VsiteExportRestfulLayout extends \VsiteExportRestfulSpaces {
       ->condition('id', $this->object->vsite)
       ->execute();
   }
+
+  /**
+   * In order to get the layout override pass the next arguments:
+   *
+   * type: GET
+   * values: {
+   *  vsite: 2
+   * }
+   */
+  public function getSpace() {
+    // Check group access.
+    $this->checkGroupAccess();
+
+    if($this->object->vsite && is_numeric($this->object->vsite)){
+      $query = db_select('spaces_overrides', 's')
+        ->condition('s.id', $this->object->vsite, '=')
+        ->fields('s',array('value', 'object_id', 'object_type', 'id'))
+        ->execute();
+
+      return $query->fetchAll();
+    } else {
+      watchdog('vsite_export', 'Vsite Export RESTful endpoint receiving non-integer vsite ID');
+    }
+
+  }
+
 }
