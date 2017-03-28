@@ -1,10 +1,10 @@
 <?php
 
 $plugin = array(
-  'label' => t('vsite layout'),
-  'description' => t('End point for vsite layout.'),
+  'label' => t('vsite lbv'),
+  'description' => t('End point for vsite layout, boxes, variables.'),
   'resource' => 'layouts',
-  'name' => 'vsite_layout__2_0',
+  'name' => 'vsite_lbv__2_0',
   'major_version' => 2,
   'minor_version' => 0,
   'class' => 'VsiteExportRestfulLayout',
