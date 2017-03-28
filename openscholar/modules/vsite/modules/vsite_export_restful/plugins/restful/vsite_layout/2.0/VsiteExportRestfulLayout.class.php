@@ -151,7 +151,7 @@ class VsiteExportRestfulLayout extends \VsiteExportRestfulSpaces {
 
       $vlb = db_select('vsite_layout_block', 'v')
         ->condition('v.sid', $this->object->vsite, '=')
-        ->fields('v', array('delta', 'context', 'module', 'region', 'weight'))
+        ->fields('v', array('delta', 'context', 'module', 'region', 'weight', 'sid'))
         ->execute();
 
       $layouts['vsite_layout_block'] = $vlb->fetchAll();
