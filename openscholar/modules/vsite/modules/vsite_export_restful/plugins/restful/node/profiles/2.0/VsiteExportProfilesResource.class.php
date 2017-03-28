@@ -13,6 +13,10 @@ class VsiteExportProfilesResource extends RestfulEntityBaseNode {
   public function publicFieldsInfo() {
     $public_fields = parent::publicFieldsInfo();
 
+
+    // TODO Determine if we need this one for export/import.
+
+
     $public_fields['description'] = array(
       'property' => 'body',
       'sub_property' => 'value',

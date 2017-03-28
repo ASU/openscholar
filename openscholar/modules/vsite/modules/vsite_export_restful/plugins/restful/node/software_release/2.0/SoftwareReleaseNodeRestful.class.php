@@ -12,23 +12,41 @@ class SoftwareReleaseNodeRestful extends VsiteExportNodeRestfulBase {
       ),
     );
 
-    $public_fields['recommended'] = array(
+
+    $public_fields['field_software_version'] = array(
+      'property' => 'field_software_version',
+    );
+
+    $public_fields['field_software_package'] = array(
+      'property' => 'field_software_package',
+      'process_callbacks' => array(
+        array($this, 'singleFileFieldDisplay'),
+      ),
+    );
+
+    $public_fields['field_software_recommended'] = array(
       'property' => 'field_software_recommended',
       'process_callbacks' => array(
         array($this, 'softwareProjectRecommended'),
       ),
     );
 
-    $public_fields['version'] = array(
-      'property' => 'field_software_version',
+    $public_fields['path'] = array(
+      'property' => 'path',
+    );
+    $public_fields['redirect'] = array(
+      'property' => 'redirect',
+    );
+    $public_fields['metatags'] = array(
+      'property' => 'metatags',
+    );
+    $public_fields['og_group_ref'] = array(
+      'property' => 'og_group_ref',
+    );
+    $public_fields['og_vocabulary'] = array(
+      'property' => 'og_vocabulary',
     );
 
-    $public_fields['package'] = array(
-      'property' => 'field_software_package',
-      'process_callbacks' => array(
-        array($this, 'singleFileFieldDisplay'),
-      ),
-    );
 
     return $public_fields;
   }

@@ -26,6 +26,56 @@ class GroupNodeRestfulBase extends VsiteExportNodeRestfulBase {
       'property' => 'type',
     );
 
+
+
+    $public_fields['title'] = array(
+      'property' => 'title',
+    );
+    $public_fields['field_organization'] = array(
+      'property' => 'field_organization',
+    );
+    $public_fields['group_group'] = array(
+      'property' => 'group_group',
+    );
+    $public_fields['field_group_path'] = array(
+      'property' => 'field_group_path',
+    );
+    $public_fields['path'] = array(
+      'property' => 'path',
+    );
+    $public_fields['redirect'] = array(
+      'property' => 'redirect',
+    );
+    $public_fields['field_site_description'] = array(
+      'property' => 'field_site_description',
+    );
+    $public_fields['field_site_address'] = array(
+      'property' => 'field_site_address',
+    );
+    $public_fields['field_site_logo'] = array(
+      'property' => 'field_site_logo',
+    );
+    $public_fields['field_group_parent'] = array(
+      'property' => 'field_group_parent',
+    );
+    $public_fields['field_subsite_domains'] = array(
+      'property' => 'field_subsite_domains',
+    );
+    $public_fields['group_access'] = array(
+      'property' => 'group_access',
+    );
+    $public_fields['metatags'] = array(
+      'property' => 'metatags',
+    );
+    $public_fields['field_meta_description'] = array(
+      'property' => 'field_meta_description',
+    );
+    $public_fields['og_roles_permissions'] = array(
+      'property' => 'og_roles_permissions',
+    );
+
+
+
     return $public_fields;
   }
 
