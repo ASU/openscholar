@@ -9,37 +9,6 @@ class VsiteExportRestfulLayout extends \VsiteExportRestfulSpaces {
 
   protected $validateHandler = 'layouts';
   protected $objectType = 'context';
-  /**
-   * Overrides \RestfulBase::controllersInfo().
-   */
-//  public static function controllersInfo() {
-//    return array(
-//      '' => array(
-//        // If they don't pass a menu-id then display nothing.
-//        \RestfulInterface::GET => 'getLayout',
-//      ),
-//    );
-//  }
-
-  /**
-   *  Get the vsite and its associated pages.
-   *
-   * @param integer $vsite_id
-   * @return array
-   */
-//  public function getLayout($vid) {
-//
-//    $output = array();
-//
-//    if (module_exists('vsite') && $vsite = vsite_get_vsite($this->request['vsite'])) {
-//      spaces_set_space($vsite);
-//      $vsite->activate_user_roles();
-//      $vsite->init_overrides();
-//      array_push($output, $vsite);
-//    }
-//
-//    return $output;
-//  }
 
   /**
    * Verify the user have access to the manage layout.
@@ -171,15 +140,32 @@ class VsiteExportRestfulLayout extends \VsiteExportRestfulSpaces {
     // Check group access.
     $this->checkGroupAccess();
 
+    $layouts = [];
+
     if($this->object->vsite && is_numeric($this->object->vsite)){
-      $query = db_select('spaces_overrides', 's')
+      $spaces = db_select('spaces_overrides', 's')
         ->condition('s.id', $this->object->vsite, '=')
         ->fields('s',array('value', 'object_id', 'object_type', 'id'))
         ->execute();
+      $layouts['spaces_overrides'] = $spaces->fetchAll();
 
-      return $query->fetchAll();
+      $vlb = db_select('vsite_layout_block', 'v')
+        ->condition('v.sid', $this->object->vsite, '=')
+        ->fields('v', array('delta', 'context', 'module', 'region', 'weight'))
+        ->execute();
+
+      $layouts['vsite_layout_block'] = $vlb->fetchAll();
+
+      if(sizeof($layouts['spaces_overrides']) > 0 && sizeof($layouts['vsite_layout_block']) > 0){
+        return $layouts;
+      } else {
+        watchdog('vsite_export', 'Empty Space/Layout configuration in export request for Vsite ' . $this->object->vsite);
+        return array();
+      }
+
     } else {
       watchdog('vsite_export', 'Vsite Export RESTful endpoint receiving non-integer vsite ID');
+      return array();
     }
 
   }
