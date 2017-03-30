@@ -196,33 +196,16 @@ class BiblioNodeRestfulBase extends VsiteExportNodeRestfulBase {
     $public_fields['biblio_refereed'] = array(
       'property' => 'biblio_refereed',
     );
-    $public_fields['redirect'] = array(
-      'property' => 'redirect',
-    );
-    $public_fields['path'] = array(
-      'property' => 'path',
-    );
-    $public_fields['field_upload'] = array(
-      'property' => 'field_upload',
-    );
     $public_fields['field_biblio_extra'] = array(
       'property' => 'field_biblio_extra',
     );
     $public_fields['field_biblio_redirect'] = array(
       'property' => 'field_biblio_redirect',
     );
-    $public_fields['metatags'] = array(
-      'property' => 'metatags',
-    );
     $public_fields['field_biblio_image'] = array(
       'property' => 'field_biblio_image',
     );
-    $public_fields['og_group_ref'] = array(
-      'property' => 'og_group_ref',
-    );
-    $public_fields['og_vocabulary'] = array(
-      'property' => 'og_vocabulary',
-    );
+
 
     return $public_fields;
   }

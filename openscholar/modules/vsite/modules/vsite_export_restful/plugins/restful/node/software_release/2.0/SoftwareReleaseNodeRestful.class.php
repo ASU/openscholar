@@ -31,22 +31,6 @@ class SoftwareReleaseNodeRestful extends VsiteExportNodeRestfulBase {
       ),
     );
 
-    $public_fields['path'] = array(
-      'property' => 'path',
-    );
-    $public_fields['redirect'] = array(
-      'property' => 'redirect',
-    );
-    $public_fields['metatags'] = array(
-      'property' => 'metatags',
-    );
-    $public_fields['og_group_ref'] = array(
-      'property' => 'og_group_ref',
-    );
-    $public_fields['og_vocabulary'] = array(
-      'property' => 'og_vocabulary',
-    );
-
 
     return $public_fields;
   }

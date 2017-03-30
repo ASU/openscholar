@@ -41,11 +41,34 @@ class VsiteExportNodeRestfulBase extends RestfulEntityBaseNode {
     );
 
     if (field_info_instance($this->getEntityType(), 'field_upload', $this->getBundle())) {
-      $public_fields['files'] = array(
+      $public_fields['field_upload'] = array(
         'property' => 'field_upload',
         'process_callbacks' => array(
           array($this, 'fileFieldDisplay'),
         ),
+      );
+    }
+
+
+    //$public_fields['redirect'] = array(
+    //  'property' => 'redirect',
+    //);
+    //$public_fields['metatags'] = array(
+    //  'property' => 'metatags',
+    //);
+    if (field_info_instance($this->getEntityType(), 'path', $this->getBundle())) {
+      $public_fields['path'] = array(
+        'property' => 'path',
+      );
+    }
+    if (field_info_instance($this->getEntityType(), 'og_group_ref', $this->getBundle())) {
+      $public_fields['og_group_ref'] = array(
+        'property' => 'og_group_ref',
+      );
+    }
+    if (field_info_instance($this->getEntityType(), 'og_vocabulary', $this->getBundle())) {
+      $public_fields['og_vocabulary'] = array(
+        'property' => 'og_vocabulary',
       );
     }
 
@@ -55,7 +78,7 @@ class VsiteExportNodeRestfulBase extends RestfulEntityBaseNode {
   protected function checkEntityAccess($op, $entity_type, $entity) {
     $request = $this->getRequest();
 
-    if ($request['vsite']) {
+    if (isset($request['vsite'])) {
       spaces_set_space(spaces_load('og', $request['vsite']));
     }
 

@@ -4,7 +4,6 @@ $plugin = array(
   'label' => t('vsite lbv'),
   'description' => t('End point for vsite layout, boxes, variables.'),
   'resource' => 'layouts',
-  'name' => 'vsite_lbv__2_0',
   'major_version' => 2,
   'minor_version' => 0,
   'class' => 'VsiteExportRestfulLayout',
@@ -13,6 +12,7 @@ $plugin = array(
     'id_column' => array('object_type', 'object_id', 'id'),
   ),
   'authentication_types' => TRUE,
-  'authentication_optional' => TRUE,
+  'authentication_optional' => FALSE,
+  'discoverable' => FALSE,
   'hook_menu' => TRUE,
 );

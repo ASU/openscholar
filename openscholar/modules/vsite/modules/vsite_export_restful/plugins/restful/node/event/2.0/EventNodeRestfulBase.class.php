@@ -39,26 +39,8 @@ class EventNodeRestfulBase extends VsiteExportNodeRestfulBase {
     $public_fields['field_event_location'] = array(
       'property' => 'field_event_location',
     );
-    $public_fields['field_upload'] = array(
-      'property' => 'field_upload',
-    );
-    $public_fields['path'] = array(
-      'property' => 'path',
-    );
-    $public_fields['redirect'] = array(
-      'property' => 'redirect',
-    );
-    $public_fields['metatags'] = array(
-      'property' => 'metatags',
-    );
     $public_fields['field_mutliple_event_signup'] = array(
       'property' => 'field_mutliple_event_signup',
-    );
-    $public_fields['og_group_ref'] = array(
-      'property' => 'og_group_ref',
-    );
-    $public_fields['og_vocabulary'] = array(
-      'property' => 'og_vocabulary',
     );
 
     return $public_fields;

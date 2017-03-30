@@ -40,12 +40,6 @@ class GroupNodeRestfulBase extends VsiteExportNodeRestfulBase {
     $public_fields['field_group_path'] = array(
       'property' => 'field_group_path',
     );
-    $public_fields['path'] = array(
-      'property' => 'path',
-    );
-    $public_fields['redirect'] = array(
-      'property' => 'redirect',
-    );
     $public_fields['field_site_description'] = array(
       'property' => 'field_site_description',
     );
@@ -64,16 +58,12 @@ class GroupNodeRestfulBase extends VsiteExportNodeRestfulBase {
     $public_fields['group_access'] = array(
       'property' => 'group_access',
     );
-    $public_fields['metatags'] = array(
-      'property' => 'metatags',
-    );
     $public_fields['field_meta_description'] = array(
       'property' => 'field_meta_description',
     );
     $public_fields['og_roles_permissions'] = array(
       'property' => 'og_roles_permissions',
     );
-
 
 
     return $public_fields;
