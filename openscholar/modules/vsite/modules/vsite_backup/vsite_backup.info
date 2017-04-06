@@ -6,3 +6,4 @@ php = "5.2.4"
 dependencies[] = ctools
 dependencies[] = vsite
 dependencies[] = vsite_menu
+dependencies[] = vsite_export_restful

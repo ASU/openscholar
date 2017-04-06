@@ -14,6 +14,8 @@ define('VSITE_BACKUP_EXPORT_STATUS_IN_PROGRESS', 'in progress');
 define('VSITE_BACKUP_EXPORT_STATUS_COMPLETE', 'complete');
 define('VSITE_BACKUP_EXPORT_FINALIZE', 'finalize');
 
+define('VSITE_BACKUP_ORG_TAXONOMY_MACHINE_NAME', 'organization');
+
 /*****************************************************************************
  HOOKS
 ******************************************************************************/
@@ -42,7 +44,6 @@ function vsite_backup_os_restful_cp_menu_admin_panel_alter(&$menu){
  */
 function vsite_backup_menu()
 {
-
   $items['vsite-backup'] = array(
     'title' => t('Vsite Backup'),
     'description' => 'Vsite vackup.',
@@ -101,13 +102,15 @@ function vsite_backup_cron_queue_info() {
 /*****************************************************************************
  CALLBACKS
 ******************************************************************************/
-function vsite_backup_page_access(){
-  if(user_access('administer vsite backup')){
+
+function vsite_backup_page_access() {
+  if (user_access('administer vsite backup')) {
     return TRUE;
   } else {
     return FALSE;
   }
 }
+
 /*****************************************************************************
  FORMS
 ******************************************************************************/
@@ -122,11 +125,82 @@ function vsite_backup_page_access(){
 
 // TODO Vsite backup form submit calls vsite_backup_create_vsite_export_queue($vsite_id)
 
+function vsite_backup_form($form, &$form_state) {
+  $vsite = og_context();
+  $count = vsite_backup_count_exports($vsite['gid']);
+  if ($count >= 3){
+    drupal_set_message(t('A site can not have more than 3 backups at a time and further backups will cause the oldest ones to be deleted. If you would like to save older backups please download them.'), 'status');
+  }
+
+  $form['description'] = array(
+    '#type' => 'item',
+    '#title' => t('Manage site backups'),
+  );
+
+  $form['export'] = array(
+    '#type' => 'submit',
+    '#value' => t('Export'),
+    '#submit' => array('vsite_backup_export'),
+  );
+       
+  return $form;
+}
 
 
 /*****************************************************************************
  INTERNAL
 ******************************************************************************/
+
+/**
+ * Query for an array of Vsite export data
+ *
+ * @param $gid
+ *
+ * @return int
+ */
+function vsite_backup_count_exports($gid){
+  $result = db_query("SELECT * FROM {vsite_backup_exports} e WHERE e.vsite_id = :gid AND e.status = 'complete'", array(':gid' => $gid));
+  $count = 0;
+
+  foreach($result as $record){
+    $count++;
+  }
+
+  return $count;
+}
+
+/**
+ * Check to see whether a backup is already in progress
+ *
+ * @param $gid
+ *
+ * @return int
+ */
+function vsite_backup_count_in_progress($gid){
+  $result = db_query("SELECT * FROM {vsite_backup_exports} e WHERE e.vsite_id = :gid AND e.status = 'in progress'", array(':gid' => $gid));
+
+  $count = 0;
+
+  foreach($result as $record){
+    $count++;
+  }
+
+  return $count;
+}
+
+//TODO Complete the delete functionality
+/**
+ * Remove extra backups after verifying non-conflicts with in-progress backups
+ *
+ * @param $gid
+ */
+function vsite_backup_equalize($gid){
+  $count = vsite_backup_count_exports($gid);
+  if($count >= 3){
+    dpm('Should be equalizing');
+  }
+}
+
 /**
  * Internal utility function to create a vsite export queue.
  *
@@ -189,51 +263,6 @@ function vsite_backup_create_vsite_export_queue($vsite_id) {
 }
 
 /**
- * Query for an array of Vsite export data
- * @param $gid
- * @return int
- */
-function vsite_backup_count_exports($gid){
-  $result = db_query("SELECT * FROM {vsite_backup_exports} e WHERE e.vsite_id = :gid AND e.status = 'complete'", array(':gid' => $gid));
-  $count = 0;
-
-  foreach($result as $record){
-    $count++;
-  }
-
-  return $count;
-}
-
-/**
- * Check to see whether a backup is already in progress
- * @param $gid
- * @return int
- */
-function vsite_backup_count_in_progress($gid){
-  $result = db_query("SELECT * FROM {vsite_backup_exports} e WHERE e.vsite_id = :gid AND e.status = 'in progress'", array(':gid' => $gid));
-
-  $count = 0;
-
-  foreach($result as $record){
-    $count++;
-  }
-
-  return $count;
-}
-
-//TODO Complete the delete functionality
-/**
- * Remove extra backups after verifying non-conflicts with in-progress backups
- * @param $gid
- */
-function vsite_backup_equalize($gid){
-  $count = vsite_backup_count_exports($gid);
-  if($count >= 3){
-    dpm('Should be equalizing');
-  }
-}
-
-/**
  * Internal function used in vsite_backup_cron_queue_info().
  *
  * @param $data
@@ -241,19 +270,13 @@ function vsite_backup_equalize($gid){
 function vsite_backup_write_export_item($data) {
 
 
+  // TODO remove debug
   watchdog('vsite queue item', var_export($data, 1));
+  // CAN LOOK AT WATCHDOG TO SEE WHAT $data LOOKS LIKE.
+  //array ( 'eid' => '9', 'vsite_id' => 4, 'item_type' => 'finalize', 'item' => '', )
+  //array ( 'eid' => '9', 'vsite_id' => 4, 'item_type' => 'vsite_layout_blocks', 'item' => array ( 'sid' => '4', 'delta' => 'os_software_releases-block_1', 'module' => 'views', 'context' => 'software_software', 'region' => 'sidebar_second', 'weight' => '-10', ), )
 
 
-  // TODO item prepare routine(s)
-  // call dispatch function for prepare item routines
-  // get RESTful represenation
-  // include drupal hooks
-
-  // TODO item writing routines
-  // Does an existing export file exist?
-  // Write item to json file
-  // or copy files.
-  // include drupal hooks
 
 
   // Final record? If yes, time to package.
@@ -263,6 +286,7 @@ function vsite_backup_write_export_item($data) {
     // TODO Do packaging routines. Get $fid
 
 
+    // Mark export as completed.
     $num_updated = db_update('vsite_backup_exports')
       ->fields(array(
         'status' => VSITE_BACKUP_EXPORT_STATUS_COMPLETE,
@@ -274,33 +298,222 @@ function vsite_backup_write_export_item($data) {
       //->condition('vsite_id', $data['vsite_id'])
       ->execute();
   }
+  // Process the item.
+  else {
 
+    // Call dispatch function for prepare item routines
+    $item = vsite_backup_prepare_item($data);
+
+    // TODO item writing routines
+    // Does an existing export file exist?
+    // Write item to json file
+    // or copy files.
+    // include drupal hooks
+
+
+// 1.X match up the $data to the resource
+// 2.X load it as a RESTful resource
+// 3.X json_encode() the resource
+// 4. locate the export file (name using unique export id (eid)) - if file doesn't exist, create it
+// 5. append to the file using fseek... see developer notes below.
+
+  }
+
+}
+
+/**
+ * Dispatch function to determine item type and return correct RESTful
+ * representation.
+ *
+ * @param $data
+ *
+ * @return $item Array
+ */
+function vsite_backup_prepare_item($data) {
+
+  // Get mappings for data item_type values to prep function names.
+  $export_prep_mappings = vsite_backup_get_export_prep_mappings();
+
+  // Dispatch to relevant function for current $data.
+  $item = $export_prep_mappings[ $data['item_type'] ]($data);
+
+  return $item;
+}
+
+/**
+ * Prepare item callbacks determined dynamically in vsite_backup_prepare_item().
+ *
+ * See also vsite_backup_get_export_prep_mappings().
+ *
+ * @param $data
+ *
+ * @return $item string Formatted as JSON
+ */
+function vsite_backup_export_prep_vsite($data) {
+
+  $resource_name = 'group';
+  $id = $data['vsite_id'];
+
+  $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
+  $result = $handler->get($id);
+
+  $item = drupal_json_encode($result);
+
+  return $item;
+}
+function vsite_backup_export_prep_global_org_taxonomy($data) {
+
+  // Get org taxonomy vid via vocabulary resource.
+  // TODO throws notice related to missing gid... do separate resource?
+  $resource_name = 'vocabulary';
+  $id = $data['item']['vid'];
+
+  $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
+  $result = $handler->get($id);
+
+  // Just need for mappings, so don't get terms.
+
+  $item = drupal_json_encode($result);
+
+  return $item;
+}
+function vsite_backup_export_prep_taxonomy($data) {
+
+  // Get taxonomy.
+  $resource_name = 'vocabulary';
+  $id = $data['item']['vid'];
+
+  $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
+  $result = $handler->get($id);
+
+  // Get terms
+  $tax_resource_name = 'taxonomy';
+  $tax_id = ''; // taxonomy term id filtering
+
+  $vsite_id = $data['vsite_id'];
+
+  $tax_request = array();
+  $tax_request['vsite'] = $vsite_id;
+  $tax_request['vid'] = $result[0]['id'];
+
+  $tax_handler = restful_get_restful_handler($tax_resource_name, $major_version = 2, $minor_version = 0);
+  $tax_result = $tax_handler->get($tax_id, $tax_request);
+
+
+  // TODO determine if this gives us the right structure or if we need meta data or to flatten more
+  $result += $tax_result;
+
+  $item = drupal_json_encode($result);
+
+  return $item;
+}
+function vsite_backup_export_prep_file($data) {
+
+  // 1. get file record
+  // 2. copy file (?)
+
+  $resource_name = 'files';
+  $id = $data['item']['entity_id'];
+
+  $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
+  $result = $handler->get($id);
+
+  $item = drupal_json_encode($result);
+
+  // Copy the file here....
+
+  return $item;
+}
+function vsite_backup_export_prep_global_user_roles($data) {
+
+  // Do nothing with global roles...
+
+  // TODO maybe export original results as json data?
+
+}
+function vsite_backup_export_prep_group_user_roles($data) {
+
+  // Get roles for current Vsite
+
+  $resource_name = 'roles';
+  $id = '';//$data['item']['nid'];
+  $vsite_id = $data['vsite_id'];
+
+  $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
+  $request = array();
+  $request['vsite'] = $vsite_id;
+  $result = $handler->get($id, $request);
+
+  $item = drupal_json_encode($result);
+
+  return $item;
+}
+function vsite_backup_export_prep_user($data) {
+
+  // Get users
+
+  $resource_name = 'users';
+  $id = $data['item']['nid'];
+
+  $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
+  $result = $handler->get($id);
+
+  $item = drupal_json_encode($result);
+
+  return $item;
+}
+function vsite_backup_export_prep_node($data) {
+
+  // Get nodes
+
+  // Differing from other prep functions, resource set on the fly based on
+  // node type.
+  $resource_name = $data['item']['bundle'];
+  $id = $data['item']['entity_id'];
+
+  $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
+  $result = $handler->get($id);
+
+  $item = drupal_json_encode($result);
+
+  return $item;
+}
+function vsite_backup_export_prep_vsite_layout_blocks($data) {
+
+  // ???????
+
+  $resource_name = $data['item_type'];
+  $id = $data['item']['nid'];
+
+  $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
+  $result = $handler->get($id);
+
+  $item = drupal_json_encode($result);
+
+  return $item;
+}
+function vsite_backup_export_prep_spaces_overrides($data) {
+
+  // get vsite_lbv
+
+  $resource_name = 'layouts';
+  $id = $data['item']['nid'];
+
+  $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
+  $result = $handler->get($id);
+
+  $item = drupal_json_encode($result);
+
+  return $item;
 }
 
 /*****************************************************************************
  THEME
 ******************************************************************************/
-function vsite_backup_form($form, &$form_state){
-  $vsite = og_context();
-  $count = vsite_backup_count_exports($vsite['gid']);
-  if($count >= 3){
-    drupal_set_message(t('A site can not have more than 3 backups at a time and further backups will cause the oldest ones to be deleted. If you would like to save older backups please download them.'), 'status');
-  }
 
-  $form['description'] = array(
-    '#type' => 'item',
-    '#title' => t('Manage site backups'),
-  );
-
-  $form['export'] = array
-  (
-    '#type' => 'submit',
-    '#value' => t('Export'),
-    '#submit' => array('vsite_backup_export'),
-  );
-
-  return $form;
-}
+/*****************************************************************************
+ API
+******************************************************************************/
 
 function vsite_backup_export($form, &$form_state){
   $vsite_id = og_context();
@@ -308,9 +521,35 @@ function vsite_backup_export($form, &$form_state){
   vsite_backup_create_vsite_export_queue($vsite_id['gid']);
   vsite_backup_equalize($vsite_id['gid']);
 }
-/*****************************************************************************
- API
-******************************************************************************/
+
+/**
+ * API function to get export prep function name mappings.
+ *
+ * @return array
+ */
+function vsite_backup_get_export_prep_mappings() {
+
+  // Map of exportable item_type to prep function which calls and prepares
+  // RESTful resource representation.
+  $export_prep_mappings = array();
+  $export_prep_mappings['vsite'] = 'vsite_backup_export_prep_vsite';
+  $export_prep_mappings['global_org_taxonomy'] = 'vsite_backup_export_prep_global_org_taxonomy';
+  $export_prep_mappings['taxonomy'] = 'vsite_backup_export_prep_taxonomy';
+  $export_prep_mappings['file'] = 'vsite_backup_export_prep_file';
+  $export_prep_mappings['global_user_roles'] = 'vsite_backup_export_prep_global_user_roles';
+  $export_prep_mappings['group_user_roles'] = 'vsite_backup_export_prep_group_user_roles';
+  $export_prep_mappings['user'] = 'vsite_backup_export_prep_user';
+  $export_prep_mappings['node'] = 'vsite_backup_export_prep_node';
+  $export_prep_mappings['vsite_layout_blocks'] = 'vsite_backup_export_prep_vsite_layout_blocks';
+  $export_prep_mappings['spaces_overrides'] = 'vsite_backup_export_prep_spaces_overrides';
+
+  // Use hook_vsite_backup_export_prep_alter() to add/remove/replace prep
+  // functions.
+  drupal_alter('vsite_backup_export_prep', $export_prep_mappings);
+
+  return $export_prep_mappings;
+}
+
 
 /*****************************************************************************
  DEVELOPER NOTES
@@ -337,6 +576,26 @@ fclose($handle);
 
 
 
- *
- *
+EXPORT/IMPORT ORDER AND MAPPINGS
+
+Exportable processing order:
+[vsite]
+[global_org_taxonomy]
+[taxonomy]
+[file]
+[global_user_roles]
+[group_user_roles]
+[user]
+[node]
+[vsite_layout_blocks]
+[spaces_overrides]
+
+Mappings table:
+{vsite_backup_import_mappings}
+import_vsite_id
+item_type
+original_item_id
+new_item_id
+
+
  */

@@ -60,9 +60,9 @@ class VsiteExportTaxonomyTerm extends VsiteExportRestfulEntityCacheableBase {
    * Display taxonomy terms from the current vsite.
    */
   protected function queryForListFilter(\EntityFieldQuery $query) {
-    if (empty($request['vsite'])) {
-      throw new \RestfulBadRequestException(t('You need to provide a vsite.'));
-    }
+//    if (empty($request['vsite'])) {
+//      throw new \RestfulBadRequestException(t('You need to provide a vsite.'));
+//    }
 
     if (!$vsite = vsite_get_vsite($this->request['vsite'])) {
       return;
