@@ -10,8 +10,6 @@
  *
  */
 
-define('VSITE_EXPORT_ORG_TAXONOMY_MACHINE_NAME', 'organization');
-
 /*****************************************************************************
  HOOKS
 ******************************************************************************/
@@ -53,15 +51,42 @@ function vsite_export_get_group_content($og_context = NULL) {
 
   foreach ($vsite_entity_types as $key => $value) {
 
-    // Get Nodes
-    $og_contents = db_select('og_membership', 'ogm')
-      ->fields('ogm', array('etid', 'type', 'entity_type'))
-      ->condition('ogm.gid', $gid, '=')
-      ->condition('ogm.entity_type', $key, '=') // 'node'
-      ->execute()->fetchAll();
+    // Get exportable group/vsite entity content
+
+    if ($key != 'node') {
+      $og_contents = db_select('og_membership', 'ogm')
+        ->fields('ogm', array('etid', 'type', 'entity_type'))
+        ->condition('ogm.gid', $gid, '=')
+        ->condition('ogm.entity_type', $key, '=') // Entity type
+        ->execute()->fetchAll();
+    }
+    else { // For nodes, get node bundle, too.
+      $og_nodes = db_select('og_membership', 'ogm');
+      $og_nodes->join('node', 'n', 'n.nid = ogm.etid'); // Cannot be chained.
+      $og_contents = $og_nodes->fields('ogm', array('etid', 'type', 'entity_type'))
+        ->fields('n', array('type'))
+        ->condition('ogm.gid', $gid, '=')
+        ->condition('ogm.entity_type', $key, '=') // Entity type
+        ->execute()->fetchAll();
+    }
 
     foreach ($og_contents as $k => $v) {
-      $exportables[$key][] = array('entity_type' => $v->entity_type, 'group_type' => $v->type, 'entity_id' => $v->etid);
+      if ($key == 'node') {
+        $exportables[$key][] = array(
+          'entity_type' => $v->entity_type,
+          'group_type' => $v->type,
+          'entity_id' => $v->etid,
+          'bundle' => $v->n_type
+        );
+      }
+      else {
+        $exportables[$key][] = array(
+          'entity_type' => $v->entity_type,
+          'group_type' => $v->type,
+          'entity_id' => $v->etid
+        );
+      }
+
     }
 
   }
@@ -106,7 +131,7 @@ function vsite_export_get_global_org_taxonomy($og_context = NULL) {
 
   $exportables = array();
 
-  $name = VSITE_EXPORT_ORG_TAXONOMY_MACHINE_NAME;
+  $name = VSITE_BACKUP_ORG_TAXONOMY_MACHINE_NAME;
 
   $exportables['global_org_taxonomy'][] = (array) taxonomy_vocabulary_machine_name_load($name);
 
@@ -261,9 +286,11 @@ function vsite_export_get_vsite_layout_blocks($og_context = NULL) {
  * Function to return exportables related to a Vsite.
  *
  * @param null $vsite
+ * @param boolean $ordered
+ *
  * @return array
  */
-function vsite_export_get_vsite_exportables($vsite = NULL) {
+function vsite_export_get_vsite_exportables($vsite = NULL, $ordered = TRUE) {
 
   // If Vsite context is supplied, set it.
   if (isset($vsite)) {
@@ -315,16 +342,37 @@ function vsite_export_get_vsite_exportables($vsite = NULL) {
   // [redirects] - We will need to copy over redirect entries?
   //  - Redirects: I don't know. We should ask the clients.
 
+  // Add/remove/alter exportables via hook_vsite_export_exportables_alter().
+  drupal_alter('vsite_export_exportables', $exportables);
 
   // TODO TOKENIZE IDs so referential entities can be re-mapped together at import.
-    // {vsite_backup_mappings}
-    // - entity type
-    // - entity bundle
-    // - entity original id
-    // - New id
+  // {vsite_backup_mappings}
+  // - entity type
+  // - entity bundle
+  // - entity original id
+  // - New id
 
 // TODO GATHER DURING CRON:
 //URL aliases for nodes, vocabs/terms and users
+
+
+  // Order exportables for ideal import sequence.
+  if ($ordered) {
+    $ordered_exportables = array();
+    $ordered_exportables['vsite'] = $exportables['vsite'];
+    $ordered_exportables['global_org_taxonomy'] = $exportables['global_org_taxonomy'];
+    $ordered_exportables['taxonomy'] = $exportables['taxonomy'];
+    $ordered_exportables['file'] = $exportables['file'];
+    $ordered_exportables['global_user_roles'] = $exportables['global_user_roles'];
+    $ordered_exportables['group_user_roles'] = $exportables['group_user_roles'];
+    $ordered_exportables['user'] = $exportables['user'];
+    $ordered_exportables['node'] = $exportables['node'];
+    $ordered_exportables['vsite_layout_blocks'] = $exportables['vsite_layout_blocks'];
+    $ordered_exportables['spaces_overrides'] = $exportables['spaces_overrides'];
+
+    return $ordered_exportables;
+  }
+
 
   return $exportables;
 }
