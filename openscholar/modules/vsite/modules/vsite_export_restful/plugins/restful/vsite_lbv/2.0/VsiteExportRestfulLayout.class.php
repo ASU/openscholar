@@ -127,4 +127,41 @@ class VsiteExportRestfulLayout extends \VsiteExportRestfulSpaces {
       ->condition('id', $this->object->vsite)
       ->execute();
   }
+
+  /**
+   * In order to get the layout override pass the next arguments:
+   *
+   * type: GET
+   * values: {
+   *  vsite: 2
+   * }
+   */
+  public function getSpace() {
+    // Check group access.
+    $this->checkGroupAccess();
+
+    $layouts = [];
+
+    if($this->object->vsite && is_numeric($this->object->vsite)){
+
+      $vlb = db_select('vsite_layout_block', 'v')
+        ->condition('v.sid', $this->object->vsite, '=')
+        ->fields('v', array('delta', 'context', 'module', 'region', 'weight'))
+        ->execute();
+
+      $layouts['vsite_layout_block'] = $vlb->fetchAll();
+
+      if(sizeof($layouts['vsite_layout_block']) > 0){
+        return $layouts;
+      } else {
+        watchdog('vsite_export', 'Empty Space/Layout configuration in export request for Vsite ' . $this->object->vsite);
+        return array();
+      }
+
+    } else {
+      watchdog('vsite_export', 'Vsite Export RESTful endpoint receiving non-integer vsite ID');
+      return array();
+    }
+
+  }
 }
