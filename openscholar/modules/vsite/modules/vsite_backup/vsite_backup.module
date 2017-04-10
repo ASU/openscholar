@@ -21,6 +21,32 @@ define('VSITE_BACKUP_ORG_TAXONOMY_MACHINE_NAME', 'organization');
 ******************************************************************************/
 
 /**
+ * Implementation of hook_views_api()
+ */
+function vsite_backup_views_api() {
+  return ( array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'vsite_backup') . "/views",
+  ));
+}
+
+/**
+ * Implements hook_views_post_execute
+ * @param $view
+ */
+function vsite_backup_views_post_execute(&$view) {
+  if ($view->name == 'vsite_backup_exports') {
+    if($vsite = vsite_get_vsite()){
+      foreach ($view->result as $key => &$result) {
+        if($result->vsite_backup_exports_vsite_id !== $vsite->id) {
+          unset($view -> result[$key]);
+        }
+      }
+    }
+  }
+}
+
+/**
  * Implements hook_os_restful_cp_menu_admin_panel_alter().
  *
  * @param $menu
@@ -47,8 +73,7 @@ function vsite_backup_menu()
   $items['vsite-backup'] = array(
     'title' => t('Vsite Backup'),
     'description' => 'Vsite vackup.',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('vsite_backup_form'),
+    'page callback' => 'vsite_backup_export_page',
     'access arguments' => array('administer vsite backup'),
     'weight' => 50,
     'menu_name' => 'vb',
@@ -144,6 +169,17 @@ function vsite_backup_form($form, &$form_state) {
   );
        
   return $form;
+}
+
+function vsite_backup_export_page(){
+
+  $form = drupal_get_form('vsite_backup_form');
+
+  $output = render($form);
+
+  $output .= views_embed_view('vsite_backup_exports','page');
+
+  return $output;
 }
 
 
@@ -592,8 +628,8 @@ Exportable processing order:
 
 Mappings table:
 {vsite_backup_import_mappings}
-import_vsite_id
-item_type
+import_vsite_id = id of export(eid)
+item_type = ex. vsite_layout or spaces overrides
 original_item_id
 new_item_id
 

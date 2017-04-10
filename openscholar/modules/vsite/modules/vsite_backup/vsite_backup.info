@@ -7,3 +7,7 @@ dependencies[] = ctools
 dependencies[] = vsite
 dependencies[] = vsite_menu
 dependencies[] = vsite_export_restful
+dependencies[] = views
+features[ctools][] = context:context:3
+features[ctools][] = views:views_default:3.0
+files[] = views/vsite_backup.views.inc
