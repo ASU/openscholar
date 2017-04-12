@@ -12,6 +12,8 @@
 
 define('VSITE_BACKUP_EXPORT_STATUS_IN_PROGRESS', 'in progress');
 define('VSITE_BACKUP_EXPORT_STATUS_COMPLETE', 'complete');
+
+define('VSITE_BACKUP_EXPORT_VSITE', 'vsite');
 define('VSITE_BACKUP_EXPORT_FINALIZE', 'finalize');
 
 define('VSITE_BACKUP_ORG_TAXONOMY_MACHINE_NAME', 'organization');
@@ -281,7 +283,8 @@ function vsite_backup_create_vsite_export_queue($vsite_id) {
   // Get vsite exportables for cron queue.
   $exportables = vsite_export_get_vsite_exportables($vsite_id);
 
-  $queue = DrupalQueue::get("vsite_export");
+  $reliablility = TRUE; // We want sequential, reliable queue processing.
+  $queue = DrupalQueue::get("vsite_export", $reliablility);
   foreach ($exportables as $item_type => $item_entries) {
 
     foreach ($item_entries as $item) {
@@ -299,24 +302,74 @@ function vsite_backup_create_vsite_export_queue($vsite_id) {
 }
 
 /**
- * Internal function used in vsite_backup_cron_queue_info().
+ * Cron queue worker callback function used in vsite_backup_cron_queue_info().
+ *
+ * See https://api.drupal.org/callback_queue_worker
+ * Exception thrown results in item being sent back into queue.
  *
  * @param $data
  */
 function vsite_backup_write_export_item($data) {
 
-
-  // TODO remove debug
-  watchdog('vsite queue item', var_export($data, 1));
+  // Debug
+  //watchdog('vsite queue item', var_export($data, 1));
   // CAN LOOK AT WATCHDOG TO SEE WHAT $data LOOKS LIKE.
-  //array ( 'eid' => '9', 'vsite_id' => 4, 'item_type' => 'finalize', 'item' => '', )
   //array ( 'eid' => '9', 'vsite_id' => 4, 'item_type' => 'vsite_layout_blocks', 'item' => array ( 'sid' => '4', 'delta' => 'os_software_releases-block_1', 'module' => 'views', 'context' => 'software_software', 'region' => 'sidebar_second', 'weight' => '-10', ), )
+  //array ( 'eid' => '9', 'vsite_id' => 4, 'item_type' => 'finalize', 'item' => '', )
+
+  // Overview:
+  // 1. match up the $data to the RESTful resource
+  // 2. load it as a RESTful resource
+  // 3. json_encode() the resource
+  // 4. locate the export file (name using unique export id (eid)) - if file doesn't exist, create it
+  // 5. append to the file using fseek()k.
+
+  // TODO check the privacy during creation before is managed file
+
+  // File locations:
+  // JSON:     private://vsite-backups/<eid>/<eid>-backup.json
+  // Files:    private://vsite-backups/<eid>/[files,also,here]
+  // Packaged: private://vsite-backups/<eid>/<date>-<eid>-backup.tar.gz
+
+  $eid = check_plain($data['eid']);
+
+  // Export destinations.
+  $destination = 'private://vsite-backups/' . $eid . '/';
+  file_prepare_directory($destination, FILE_CREATE_DIRECTORY);
+  $destination_filename = $eid . '-backup.json';
+  $json_file = $destination . $destination_filename;
+
+  // Call prepare dispatch function to load items as their RESTful resource
+  // JSON representation.
+  if ($data['item_type'] != VSITE_BACKUP_EXPORT_FINALIZE) {
+    $item = vsite_backup_prepare_item($data);
+  }
 
 
+  // DETERMINE WHAT TO DO WITH THIS ITEM.
 
+  // FINALIZE
+  if (file_exists($json_file) && $data['item_type'] == VSITE_BACKUP_EXPORT_FINALIZE) {
 
-  // Final record? If yes, time to package.
-  if ($data['item_type'] == VSITE_BACKUP_EXPORT_FINALIZE) {
+    /* TODO if this is of the reliable queue type, then according to docs, it should process in sequence.
+    // Guard against race conditions.
+    $driver = db_driver();
+    if ($driver == 'mysql') {
+
+      // Query to see if there are > 1 entries left in {queue} for this eid.
+      // Helpful: http://www.russellengland.com/2012/07/how-to-unserialize-data-using-mysql.html
+      $result = db_query('SELECT SUBSTRING_INDEX(SUBSTRING_INDEX(data,\';\', 2),\':\',-1) AS eid FROM {queue} WHERE name = \'vsite_export\' AND SUBSTRING_INDEX(SUBSTRING_INDEX(data,\';\', 2),\':\',-1) = :eid ', array(':eid' => '"'.$eid.'"'));
+      $count = $result->rowCount();
+      if ($count > 1) {
+        // Exception will cause this to go back into the queue for later rerun.
+        throw new Exception(t('Vsite finalize cannot be run until there are no other items with the same eid in the queue. Postponing finalize.'));
+      }
+    }
+    // No pgsql alternative query. Below is an untested effort in that
+    // direction. Without this, Postgres sites lack a guard against race
+    // conditions.
+    //"SELECT reverse(split_part(split_part(data, ';', 2), ':', 1)) AS eid FROM {queue} WHERE name = 'vsite_export' AND reverse(split_part(split_part(data, ';', 2), ':', 1)) = ";
+    */
 
 
     // TODO Do packaging routines. Get $fid
@@ -333,26 +386,54 @@ function vsite_backup_write_export_item($data) {
       ->condition('eid', $data['eid'])
       //->condition('vsite_id', $data['vsite_id'])
       ->execute();
+
   }
-  // Process the item.
+  // WRITE ITEM
+  elseif (file_exists($json_file)) {
+
+
+  // TODO write the item
+    // todo try/catch with exception?
+
+    if ($item) {
+// TODO need to have item type on prepared items...
+
+      $handle = fopen($json_file, 'c') or die('Cannot open file:  ' . $json_file);
+      //$handle = fopen($json_file, 'a') or die('Cannot open file:  '.$json_file);
+      flock($handle, LOCK_EX); // Guard against collisions.
+      $item = "\n,\n" . ltrim($item, '[') . "\n"; // Trim leading sq bracket.
+      // Put pointer inside the original array sq bracket.
+      fseek($handle, -2, SEEK_END);
+      fwrite($handle, $item);
+      flock($handle, LOCK_UN); // Unlock.
+      //fclose($handle);
+
+    }
+
+
+  }
+  // CREATE FILE and WRITE VSITE ITEM
+  elseif (!file_exists($json_file) && $data['item_type'] == VSITE_BACKUP_EXPORT_VSITE) {
+
+    // TODO
+      // todo try/catch with exception?
+
+    // Handles creation if doesn't exist, or opens if does.
+    $handle = fopen($json_file, 'c') or die('Cannot open file:  '.$json_file);
+    //$handle = fopen($json_file, 'a') or die('Cannot open file:  '.$json_file);
+    flock($handle, LOCK_EX); // Guard against collisions.
+    $item = trim($item) . "\n";
+    fwrite($handle, $item);
+    flock($handle, LOCK_UN); // Unlock.
+    //fclose($handle);
+
+  }
+  // THROW EXCEPTION, tried to write item before file created. Race condition.
   else {
 
-    // Call dispatch function for prepare item routines
-    $item = vsite_backup_prepare_item($data);
-
-    // TODO item writing routines
-    // Does an existing export file exist?
-    // Write item to json file
-    // or copy files.
-    // include drupal hooks
-
-
-// 1.X match up the $data to the resource
-// 2.X load it as a RESTful resource
-// 3.X json_encode() the resource
-// 4. locate the export file (name using unique export id (eid)) - if file doesn't exist, create it
-// 5. append to the file using fseek... see developer notes below.
-
+    // Exception thrown in cron worker callback results in item being sent
+    // back into queue for reprocessing.
+    throw new Exception(t('Vsite item_type not yet processed in queue. It must go first to create the file.'));
   }
 
 }
@@ -489,7 +570,7 @@ function vsite_backup_export_prep_user($data) {
   // Get users
 
   $resource_name = 'users';
-  $id = $data['item']['nid'];
+  $id = $data['item']['entity_id'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
   $result = $handler->get($id);
@@ -517,7 +598,8 @@ function vsite_backup_export_prep_node($data) {
 function vsite_backup_export_prep_vsite_layout_blocks($data) {
 
   // ???????
-
+  // TODO
+return;
   $resource_name = $data['item_type'];
   $id = $data['item']['nid'];
 
@@ -531,7 +613,8 @@ function vsite_backup_export_prep_vsite_layout_blocks($data) {
 function vsite_backup_export_prep_spaces_overrides($data) {
 
   // get vsite_lbv
-
+  // TODO
+return;
   $resource_name = 'layouts';
   $id = $data['item']['nid'];
 

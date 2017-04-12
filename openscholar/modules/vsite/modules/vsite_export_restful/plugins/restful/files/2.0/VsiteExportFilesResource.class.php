@@ -897,6 +897,7 @@ class VsiteExportFilesResource extends VsiteExportRestfulEntityCacheableBase {
  * Replaces the core file_validate_extensions function when the file in question
  * has a temporary extension.
  */
+/*
 function file_validate_extension_from_mimetype(stdClass $file, $extensions) {
   include_once DRUPAL_ROOT . '/includes/file.mimetypes.inc';
   $maps = file_mimetype_mapping();
@@ -912,3 +913,4 @@ function file_validate_extension_from_mimetype(stdClass $file, $extensions) {
 
   return $errors;
 }
+*/
