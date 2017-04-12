@@ -4,6 +4,8 @@
  * Implements hook_views_default_views().
  */
 function vsite_backup_views_default_views(){
+  $export = array();
+
   $view = new view();
   $view->name = 'vsite_backup_exports';
   $view->description = '';
@@ -108,5 +110,8 @@ function vsite_backup_views_default_views(){
   $handler->display->display_options['pager']['type'] = 'some';
   $handler->display->display_options['pager']['options']['items_per_page'] = '5';
 
+  $export['vsite_backup_exports'] = $view;
+
+  return $export;
 
 }
