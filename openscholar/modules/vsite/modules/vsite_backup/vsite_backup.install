@@ -200,6 +200,7 @@ function vsite_backup_schema() {
         'not null' => TRUE,
       ),
     ),
+    'primary key' => array('action_id'),
   );
 
 
