@@ -154,6 +154,10 @@ function vsite_export_get_group_spaces_overrides($og_context = NULL) {
 
   $exportables = array();
 
+
+//$exportables['spaces_overrides'] = $vsite_id;
+//return $exportables;
+
   // contents of spaces_overrides table
 
   // select * from spaces_overrides where id = <vsite nid>;
@@ -224,6 +228,10 @@ function vsite_export_get_vsite_layout_blocks($og_context = NULL) {
   $vsite_id = $gid;
 
   $exportables = array();
+
+
+//$exportables['vsite_layout_blocks'] = $vsite_id;
+//return $exportables;
 
   // select * from vsite_layout_block where sid = <vsite nid>;
   $results = db_query("SELECT * FROM {vsite_layout_block} WHERE sid  = :vsite_id", array(':vsite_id' => $vsite_id));

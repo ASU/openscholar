@@ -9,7 +9,7 @@ $plugin = array(
   'class' => 'VsiteExportRestfulLayout',
   'data_provider_options' => array(
     'table_name' => 'spaces_overrides',
-    'id_column' => array('object_type', 'object_id', 'id'),
+    'id_column' => array('object_type', 'object_id', 'id'), // These columns don't exist in this table.
   ),
   'authentication_types' => TRUE,
   'authentication_optional' => FALSE,

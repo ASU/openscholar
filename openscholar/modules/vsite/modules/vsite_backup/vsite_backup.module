@@ -282,6 +282,12 @@ function vsite_backup_create_vsite_export_queue($vsite_id) {
 
   // Get vsite exportables for cron queue.
   $exportables = vsite_export_get_vsite_exportables($vsite_id);
+  // vsite_layout_blocks and spaces_overrides need only one queque entry each.
+  // Their data is processed as an aggregate in the queue, since their RESTful
+  // resources return all a vsite's entries in one call.
+  $exportables['spaces_overrides'] = array('vsite_id' => $vsite_id);
+  $exportables['vsite_layout_blocks'] = array('vsite_id' => $vsite_id);
+
 
   $reliablility = TRUE; // We want sequential, reliable queue processing.
   $queue = DrupalQueue::get("vsite_export", $reliablility);
@@ -391,17 +397,13 @@ function vsite_backup_write_export_item($data) {
   // WRITE ITEM
   elseif (file_exists($json_file)) {
 
-
-  // TODO write the item
-    // todo try/catch with exception?
+    // TODO try/catch with exception?
 
     if ($item) {
-// TODO need to have item type on prepared items...
 
       $handle = fopen($json_file, 'c') or die('Cannot open file:  ' . $json_file);
-      //$handle = fopen($json_file, 'a') or die('Cannot open file:  '.$json_file);
       flock($handle, LOCK_EX); // Guard against collisions.
-      $item = "\n,\n" . ltrim($item, '[') . "\n"; // Trim leading sq bracket.
+      $item = ",\n" . ltrim($item, '[') . "\n"; // Trim leading sq bracket.
       // Put pointer inside the original array sq bracket.
       fseek($handle, -2, SEEK_END);
       fwrite($handle, $item);
@@ -410,17 +412,14 @@ function vsite_backup_write_export_item($data) {
 
     }
 
-
   }
   // CREATE FILE and WRITE VSITE ITEM
   elseif (!file_exists($json_file) && $data['item_type'] == VSITE_BACKUP_EXPORT_VSITE) {
 
-    // TODO
-      // todo try/catch with exception?
+    // TODO try/catch with exception?
 
     // Handles creation if doesn't exist, or opens if does.
     $handle = fopen($json_file, 'c') or die('Cannot open file:  '.$json_file);
-    //$handle = fopen($json_file, 'a') or die('Cannot open file:  '.$json_file);
     flock($handle, LOCK_EX); // Guard against collisions.
     $item = trim($item) . "\n";
     fwrite($handle, $item);
@@ -452,7 +451,11 @@ function vsite_backup_prepare_item($data) {
   $export_prep_mappings = vsite_backup_get_export_prep_mappings();
 
   // Dispatch to relevant function for current $data.
-  $item = $export_prep_mappings[ $data['item_type'] ]($data);
+  $raw_item = $export_prep_mappings[ $data['item_type'] ]($data);
+  // Want item rows in JSON to have the item type indicated, but not to have
+  // keys collide and overwrite.
+  $item = drupal_json_encode(array( array($data['item_type'] => $raw_item)));
+
 
   return $item;
 }
@@ -474,9 +477,7 @@ function vsite_backup_export_prep_vsite($data) {
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
   $result = $handler->get($id);
 
-  $item = drupal_json_encode($result);
-
-  return $item;
+  return $result;
 }
 function vsite_backup_export_prep_global_org_taxonomy($data) {
 
@@ -490,9 +491,7 @@ function vsite_backup_export_prep_global_org_taxonomy($data) {
 
   // Just need for mappings, so don't get terms.
 
-  $item = drupal_json_encode($result);
-
-  return $item;
+  return $result;
 }
 function vsite_backup_export_prep_taxonomy($data) {
 
@@ -516,13 +515,10 @@ function vsite_backup_export_prep_taxonomy($data) {
   $tax_handler = restful_get_restful_handler($tax_resource_name, $major_version = 2, $minor_version = 0);
   $tax_result = $tax_handler->get($tax_id, $tax_request);
 
-
-  // TODO determine if this gives us the right structure or if we need meta data or to flatten more
+  // First item in array is vocabulary, all following are terms.
   $result += $tax_result;
 
-  $item = drupal_json_encode($result);
-
-  return $item;
+  return $result;
 }
 function vsite_backup_export_prep_file($data) {
 
@@ -535,17 +531,17 @@ function vsite_backup_export_prep_file($data) {
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
   $result = $handler->get($id);
 
-  $item = drupal_json_encode($result);
 
-  // Copy the file here....
+// TODO ???? Copy the file now....
 
-  return $item;
+
+  return $result;
 }
 function vsite_backup_export_prep_global_user_roles($data) {
 
   // Do nothing with global roles...
 
-  // TODO maybe export original results as json data?
+  // TODO maybe export original exportables results as json data?
 
 }
 function vsite_backup_export_prep_group_user_roles($data) {
@@ -561,9 +557,7 @@ function vsite_backup_export_prep_group_user_roles($data) {
   $request['vsite'] = $vsite_id;
   $result = $handler->get($id, $request);
 
-  $item = drupal_json_encode($result);
-
-  return $item;
+  return $result;
 }
 function vsite_backup_export_prep_user($data) {
 
@@ -575,9 +569,7 @@ function vsite_backup_export_prep_user($data) {
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
   $result = $handler->get($id);
 
-  $item = drupal_json_encode($result);
-
-  return $item;
+  return $result;
 }
 function vsite_backup_export_prep_node($data) {
 
@@ -591,39 +583,37 @@ function vsite_backup_export_prep_node($data) {
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
   $result = $handler->get($id);
 
-  $item = drupal_json_encode($result);
-
-  return $item;
+  return $result;
 }
 function vsite_backup_export_prep_vsite_layout_blocks($data) {
 
-  // ???????
-  // TODO
-return;
-  $resource_name = $data['item_type'];
-  $id = $data['item']['nid'];
+  // Get all, aggregated contents of {vsite_layout_blocks} through RESTful
+  // resource.
+
+  $resource_name = 'layouts';
+  $vsite_id = $data['item']['vsite_id'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
-  $result = $handler->get($id);
+  $request = array();
+  $request['vsite'] = $vsite_id;
+  $result = $handler->get('', $request);
 
-  $item = drupal_json_encode($result);
-
-  return $item;
+  return $result;
 }
 function vsite_backup_export_prep_spaces_overrides($data) {
 
-  // get vsite_lbv
-  // TODO
-return;
-  $resource_name = 'layouts';
-  $id = $data['item']['nid'];
+  // Get all, aggregated contents of {spaces_overrides} through RESTful
+  // resource.
+
+  $resource_name = 'spacesOverrides';
+  $vsite_id = $data['item']['vsite_id'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
-  $result = $handler->get($id);
+  $request = array();
+  $request['vsite'] = $vsite_id;
+  $result = $handler->get('', $request);
 
-  $item = drupal_json_encode($result);
-
-  return $item;
+  return $result;
 }
 
 /*****************************************************************************
