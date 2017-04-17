@@ -12,11 +12,11 @@
 
 define('VSITE_BACKUP_EXPORT_STATUS_IN_PROGRESS', 'in progress');
 define('VSITE_BACKUP_EXPORT_STATUS_COMPLETE', 'complete');
-
+define('VSITE_BACKUP_EXPORT_STATUS_FAILED', 'failed');
 define('VSITE_BACKUP_EXPORT_VSITE', 'vsite');
 define('VSITE_BACKUP_EXPORT_FINALIZE', 'finalize');
-
 define('VSITE_BACKUP_ORG_TAXONOMY_MACHINE_NAME', 'organization');
+define('VSITE_BACKUP_DIRECTORY_NAME', 'vsite-backups');
 
 /*****************************************************************************
  HOOKS
@@ -246,6 +246,9 @@ function vsite_backup_equalize($gid){
  */
 function vsite_backup_create_vsite_export_queue($vsite_id) {
 
+  global $user;
+  $uid = $user->uid;
+
   // Is there an export already in progress for this vsite?
   $result = db_select('vsite_backup_exports', 'e')
     ->fields('e')
@@ -303,8 +306,9 @@ function vsite_backup_create_vsite_export_queue($vsite_id) {
     }
 
   }
-  // Final item, used to trigger packaging.
-  $queue->createItem(array('eid' => $eid, 'vsite_id' => $vsite_id, 'item_type' => VSITE_BACKUP_EXPORT_FINALIZE, 'item' => ''));
+  // Final item, used to trigger packaging. Include uid for setting packaged
+  // file ownership.
+  $queue->createItem(array('eid' => $eid, 'vsite_id' => $vsite_id, 'item_type' => VSITE_BACKUP_EXPORT_FINALIZE, 'item' => '', 'uid' => $uid));
 }
 
 /**
@@ -319,6 +323,7 @@ function vsite_backup_write_export_item($data) {
 
   // Debug
   //watchdog('vsite queue item', var_export($data, 1));
+
   // CAN LOOK AT WATCHDOG TO SEE WHAT $data LOOKS LIKE.
   //array ( 'eid' => '9', 'vsite_id' => 4, 'item_type' => 'vsite_layout_blocks', 'item' => array ( 'sid' => '4', 'delta' => 'os_software_releases-block_1', 'module' => 'views', 'context' => 'software_software', 'region' => 'sidebar_second', 'weight' => '-10', ), )
   //array ( 'eid' => '9', 'vsite_id' => 4, 'item_type' => 'finalize', 'item' => '', )
@@ -330,20 +335,23 @@ function vsite_backup_write_export_item($data) {
   // 4. locate the export file (name using unique export id (eid)) - if file doesn't exist, create it
   // 5. append to the file using fseek()k.
 
-  // TODO check the privacy during creation before is managed file
-
   // File locations:
   // JSON:     private://vsite-backups/<eid>/<eid>-backup.json
   // Files:    private://vsite-backups/<eid>/[files,also,here]
-  // Packaged: private://vsite-backups/<eid>/<date>-<eid>-backup.tar.gz
+  // Packaged: private://vsite-backups/vsite-<eid>-backup.tar.gz
+  // After successful tarball creation, working directory at
+  //   private://vsite-backups/<eid>/ will be purged. This can be disabled
+  //   via $backup_debug variable further down.
 
   $eid = check_plain($data['eid']);
 
   // Export destinations.
-  $destination = 'private://vsite-backups/' . $eid . '/';
-  file_prepare_directory($destination, FILE_CREATE_DIRECTORY);
-  $destination_filename = $eid . '-backup.json';
-  $json_file = $destination . $destination_filename;
+//  $destination = variable_get('file_private_path') . "/vsite-backups/" . $eid . "/";
+  $destination = 'private://' . VSITE_BACKUP_DIRECTORY_NAME . '/';
+  $destination_eid = $destination . $eid . '/';
+  file_prepare_directory($destination_eid, FILE_CREATE_DIRECTORY);
+  $destination_filename = $eid . "-backup.json";
+  $json_file = $destination_eid . $destination_filename;
 
   // Call prepare dispatch function to load items as their RESTful resource
   // JSON representation.
@@ -357,36 +365,73 @@ function vsite_backup_write_export_item($data) {
   // FINALIZE
   if (file_exists($json_file) && $data['item_type'] == VSITE_BACKUP_EXPORT_FINALIZE) {
 
-    /* TODO if this is of the reliable queue type, then according to docs, it should process in sequence.
-    // Guard against race conditions.
-    $driver = db_driver();
-    if ($driver == 'mysql') {
+    // This is a reliable queue type, so according to docs, it will process
+    // in sequence. No need to strongly guard against race conditions.
 
-      // Query to see if there are > 1 entries left in {queue} for this eid.
-      // Helpful: http://www.russellengland.com/2012/07/how-to-unserialize-data-using-mysql.html
-      $result = db_query('SELECT SUBSTRING_INDEX(SUBSTRING_INDEX(data,\';\', 2),\':\',-1) AS eid FROM {queue} WHERE name = \'vsite_export\' AND SUBSTRING_INDEX(SUBSTRING_INDEX(data,\';\', 2),\':\',-1) = :eid ', array(':eid' => '"'.$eid.'"'));
-      $count = $result->rowCount();
-      if ($count > 1) {
-        // Exception will cause this to go back into the queue for later rerun.
-        throw new Exception(t('Vsite finalize cannot be run until there are no other items with the same eid in the queue. Postponing finalize.'));
-      }
+    // Do packaging routines. And get $fid.
+
+    $finalize_status = VSITE_BACKUP_EXPORT_STATUS_COMPLETE;
+
+    // Package the files into a tarball.
+    try {
+
+      // Set destination variables.
+      $gz_destination = variable_get('file_private_path') . '/' . VSITE_BACKUP_DIRECTORY_NAME . '/' . $eid . '/';
+      $gz_name = 'vsite-' . $eid . '-backup.tar';
+      $gz = new PharData($gz_destination . $gz_name);
+
+      // Add all our collected backup files.
+      $gz->buildFromDirectory($gz_destination);
+
+      // Compress as .gz file.
+      $gz->compress(Phar::GZ);
     }
-    // No pgsql alternative query. Below is an untested effort in that
-    // direction. Without this, Postgres sites lack a guard against race
-    // conditions.
-    //"SELECT reverse(split_part(split_part(data, ';', 2), ':', 1)) AS eid FROM {queue} WHERE name = 'vsite_export' AND reverse(split_part(split_part(data, ';', 2), ':', 1)) = ";
-    */
+    catch (Exception $e) {
 
+      watchdog('vsite_backup failed', t('Exception : ') . $e);
+      $finalize_status = VSITE_BACKUP_EXPORT_STATUS_FAILED;
+    }
 
-    // TODO Do packaging routines. Get $fid
+    // After packaging, add as Drupal managed file, and cleanup non-packaged
+    // files.
+    if ($finalize_status == VSITE_BACKUP_EXPORT_STATUS_COMPLETE) {
+
+      $handle = fopen($gz_destination . $gz_name . '.gz', 'r');
+      // $destination has private:// so will be created as private file.
+      // Save it up a level, as we'll cleanup the working directory.
+      $managed_file = file_save_data($handle, $destination . $gz_name . '.gz');
+      fclose($handle);
+
+    }
+    $gz_fid = isset($managed_file->fid) ? $managed_file->fid : NULL;
+
+// TODO change and document permissions changes. View own private files. or somesuch.
+    // Change file ownership.
+    $gz_file = file_load($gz_fid);
+    $gz_file->uid = $data['uid']; // UID is included with finalize item.
+    file_save($gz_file);
+
+    // Set TRUE to DEBUG. Will allow you to inspect working files built for
+    // creation of tarball.
+    $backup_debug = FALSE;
+    if (!$backup_debug) { // Don't cleanup if we want to debug.
+
+      // Win or fail, we cleanup.
+      try {
+        _vsite_backup_rm_recursive($gz_destination); // backup directory
+      }
+      catch (Exception $e) {
+        watchdog('vsite_backup cleanup', t('Working file cleanup error. Exception : ') . $e);
+      }
+
+    }
 
 
     // Mark export as completed.
     $num_updated = db_update('vsite_backup_exports')
       ->fields(array(
-        'status' => VSITE_BACKUP_EXPORT_STATUS_COMPLETE,
-        // TODO Add value for $fid
-        //'fid' => 0,
+        'status' => $finalize_status,
+        'fid' => $gz_fid,
         'completed' => REQUEST_TIME,
       ))
       ->condition('eid', $data['eid'])
@@ -396,8 +441,6 @@ function vsite_backup_write_export_item($data) {
   }
   // WRITE ITEM
   elseif (file_exists($json_file)) {
-
-    // TODO try/catch with exception?
 
     if ($item) {
 
@@ -415,8 +458,6 @@ function vsite_backup_write_export_item($data) {
   }
   // CREATE FILE and WRITE VSITE ITEM
   elseif (!file_exists($json_file) && $data['item_type'] == VSITE_BACKUP_EXPORT_VSITE) {
-
-    // TODO try/catch with exception?
 
     // Handles creation if doesn't exist, or opens if does.
     $handle = fopen($json_file, 'c') or die('Cannot open file:  '.$json_file);
@@ -475,6 +516,8 @@ function vsite_backup_export_prep_vsite($data) {
   $id = $data['vsite_id'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
+$account = user_load(1);
+$handler->setAccount($account);
   $result = $handler->get($id);
 
   return $result;
@@ -487,6 +530,8 @@ function vsite_backup_export_prep_global_org_taxonomy($data) {
   $id = $data['item']['vid'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
+$account = user_load(1);
+$handler->setAccount($account);
   $result = $handler->get($id);
 
   // Just need for mappings, so don't get terms.
@@ -500,6 +545,8 @@ function vsite_backup_export_prep_taxonomy($data) {
   $id = $data['item']['vid'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
+$account = user_load(1);
+$handler->setAccount($account);
   $result = $handler->get($id);
 
   // Get terms
@@ -513,6 +560,7 @@ function vsite_backup_export_prep_taxonomy($data) {
   $tax_request['vid'] = $result[0]['id'];
 
   $tax_handler = restful_get_restful_handler($tax_resource_name, $major_version = 2, $minor_version = 0);
+$tax_handler->setAccount($account);
   $tax_result = $tax_handler->get($tax_id, $tax_request);
 
   // First item in array is vocabulary, all following are terms.
@@ -522,18 +570,30 @@ function vsite_backup_export_prep_taxonomy($data) {
 }
 function vsite_backup_export_prep_file($data) {
 
-  // 1. get file record
-  // 2. copy file (?)
+  // 1. Get file RESTfl resource record.
+  // 2. Copy file to export directory.
 
   $resource_name = 'files';
   $id = $data['item']['entity_id'];
+  $eid = $data['eid'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
+$account = user_load(1);
+$handler->setAccount($account);
   $result = $handler->get($id);
 
+  // Backup files destination.
+  //$file_destination = variable_get('file_private_path') . "/vsite-backups/" . $eid . "/files/";
+  $file_destination = 'private://' . VSITE_BACKUP_DIRECTORY_NAME . '/' . $eid . '/files/';
+  file_prepare_directory($file_destination, FILE_CREATE_DIRECTORY);
 
-// TODO ???? Copy the file now....
-
+  // Copy the file to backup directory.
+  // TODO If using the URL proves to be poor for performance, we can add URI to
+  // the files resource, and try copying from there.
+  if (!@copy($result[0]['url'], $file_destination . $result[0]['filename'] )) {
+    $errors = error_get_last();
+    watchdog("vsite_backup copy error", $errors['type'] . " : " . $errors['message']);
+  }
 
   return $result;
 }
@@ -553,6 +613,8 @@ function vsite_backup_export_prep_group_user_roles($data) {
   $vsite_id = $data['vsite_id'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
+$account = user_load(1);
+$handler->setAccount($account);
   $request = array();
   $request['vsite'] = $vsite_id;
   $result = $handler->get($id, $request);
@@ -567,6 +629,8 @@ function vsite_backup_export_prep_user($data) {
   $id = $data['item']['entity_id'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
+$account = user_load(1);
+$handler->setAccount($account);
   $result = $handler->get($id);
 
   return $result;
@@ -581,6 +645,8 @@ function vsite_backup_export_prep_node($data) {
   $id = $data['item']['entity_id'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
+$account = user_load(1);
+$handler->setAccount($account);
   $result = $handler->get($id);
 
   return $result;
@@ -591,9 +657,11 @@ function vsite_backup_export_prep_vsite_layout_blocks($data) {
   // resource.
 
   $resource_name = 'layouts';
-  $vsite_id = $data['item']['vsite_id'];
+  $vsite_id = $data['vsite_id'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
+$account = user_load(1);
+$handler->setAccount($account);
   $request = array();
   $request['vsite'] = $vsite_id;
   $result = $handler->get('', $request);
@@ -606,14 +674,32 @@ function vsite_backup_export_prep_spaces_overrides($data) {
   // resource.
 
   $resource_name = 'spacesOverrides';
-  $vsite_id = $data['item']['vsite_id'];
+  $vsite_id = $data['vsite_id'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
+$account = user_load(1);
+$handler->setAccount($account);
   $request = array();
   $request['vsite'] = $vsite_id;
   $result = $handler->get('', $request);
 
   return $result;
+}
+
+/**
+ * Internal function for use in cleaning up working directories and files.
+ *
+ */
+function _vsite_backup_rm_recursive($dir) {
+
+  // Find the files.
+  $files = array_diff(scandir($dir), array('.','..'));
+  // Recursively delete.
+  foreach ($files as $file) {
+    (is_dir("$dir/$file")) ? _vsite_backup_rm_recursive("$dir/$file") : unlink("$dir/$file");
+  }
+
+  return rmdir($dir);
 }
 
 /*****************************************************************************
