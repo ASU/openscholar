@@ -8,6 +8,12 @@ INSTALLATION
 
 Install as usual, see http://drupal.org/node/70151 for further information.
 
+Grant File Entity's "View own private files" permission to the Authenticated
+User role.
+
+Ensure site has a private file system configured through the UI at
+admin/config/media/file-system
+
 
 DEPENDENCIES
 --------------------------
@@ -15,8 +21,11 @@ DEPENDENCIES
 DRUPAL MODULES
  - ctools 
  - vsite
- - vsite_export
- 
+ - vsite_menu
+ - vsite_export_restful
+ - views
+ - file_entity
+
 PERMISSIONS
 --------------------------
 
