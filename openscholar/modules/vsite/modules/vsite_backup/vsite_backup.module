@@ -196,6 +196,19 @@ function vsite_backup_export_page(){
  *
  * @return int
  */
+function vsite_backup_get_exports($gid){
+  $result = db_query("SELECT * FROM {vsite_backup_exports} e WHERE e.vsite_id = :gid AND e.status = 'complete' ORDER BY e.eid", array(':gid' => $gid));
+
+  return $result;
+}
+
+/**
+ * Query for an array of Vsite export data
+ *
+ * @param $gid
+ *
+ * @return int
+ */
 function vsite_backup_count_exports($gid){
   $result = db_query("SELECT * FROM {vsite_backup_exports} e WHERE e.vsite_id = :gid AND e.status = 'complete'", array(':gid' => $gid));
   $count = 0;
@@ -226,16 +239,52 @@ function vsite_backup_count_in_progress($gid){
   return $count;
 }
 
-//TODO Complete the delete functionality
 /**
- * Remove extra backups after verifying non-conflicts with in-progress backups
+ * Remove extra backups if there are more than 3.
  *
  * @param $gid
  */
 function vsite_backup_equalize($gid){
+  $results = [];
   $count = vsite_backup_count_exports($gid);
-  if($count >= 3){
-    dpm('Should be equalizing');
+  if($count > 3)
+  {
+    // exports must be in ascending order by their eid
+    $exports = vsite_backup_get_exports($gid);
+    foreach($exports as $export){
+      array_push($results, $export);
+    }
+    $size = count($results);
+    $results = array_slice($results,0, $size-3);
+    vsite_backup_equalize_files($results);
+    vsite_backup_equalize_records($results);
+  }
+}
+
+/**
+ * Delete files related to an array of exports.
+ *
+ * @param $exports
+ */
+function vsite_backup_equalize_files($exports){
+
+  foreach($exports as $export){
+    $file = file_load($export->fid);
+    file_delete($file);
+  }
+
+}
+
+/**
+ * Delete DB records related to an array of exports.
+ *
+ * @param $exports
+ */
+function vsite_backup_equalize_records($exports){
+  foreach($exports as $export){
+    db_delete('vsite_backup_exports')
+      ->condition('eid', $export->eid)
+      ->execute();
   }
 }
 
@@ -344,6 +393,7 @@ function vsite_backup_write_export_item($data) {
   //   via $backup_debug variable further down.
 
   $eid = check_plain($data['eid']);
+  $vsite = check_plain($data['vsite_id']);
 
   // Export destinations.
   //$destination = variable_get('file_private_path') . "/vsite-backups/" . $eid . "/";
@@ -446,6 +496,12 @@ function vsite_backup_write_export_item($data) {
       ->condition('eid', $data['eid'])
       //->condition('vsite_id', $data['vsite_id'])
       ->execute();
+
+    // If backup successfully saves file and finalize status is complete
+    // we want to trim the other items from the vsite's backups
+    if($finalize_status == VSITE_BACKUP_EXPORT_STATUS_COMPLETE){
+      vsite_backup_equalize($vsite);
+    }
 
   }
   // WRITE ITEM
@@ -723,7 +779,7 @@ function vsite_backup_export($form, &$form_state){
   $vsite_id = og_context();
   drupal_set_message('Your site has been queued for backup.', 'status');
   vsite_backup_create_vsite_export_queue($vsite_id['gid']);
-  vsite_backup_equalize($vsite_id['gid']);
+//  vsite_backup_equalize($vsite_id['gid']);
 }
 
 /**
