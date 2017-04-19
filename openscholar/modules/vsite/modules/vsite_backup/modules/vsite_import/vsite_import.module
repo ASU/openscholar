@@ -1,1 +1,134 @@
 <?php
+
+define('VSITE_IMPORT_DIRECTORY_NAME', 'vsite-imports');
+
+/**
+ * Implements hook_permission().
+ *
+ * @return array
+ */
+function vsite_import_permission() {
+  return array(
+    'administer vsite import' => array(
+      'title' => t('Administer Vsite Import'),
+      'description' => t('Access Vsite Import admin pages.'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_menu()
+ *
+ * @return array
+ */
+function vsite_import_menu() {
+  $items = array();
+  $items['admin/config/vsite-import'] = array(
+    'title' => 'Vsite Import',
+    'description' => 'Allows administrators to manage Vsite Imports',
+    'weight' => -30,
+    'page callback' => 'drupal_get_form',
+//    'page arguments' => array('vsite_import_admin_settings_form'),
+    'access arguments' => array('administer vsite import'),
+  );
+
+  $items['admin/config/vsite-import/manage'] = array(
+    'title' => 'Vsite Import',
+    'description' => 'Allows administrators to manage Vsite Imports',
+    'page callback' => 'vsite_import_page',
+    'access arguments' => array('administer vsite import'),
+    'weight' => -10,
+  );
+
+  return $items;
+}
+
+/**
+ * Custom page callback to render configuration form along with associated
+ * import views.
+ *
+ * @return string
+ */
+function vsite_import_page(){
+
+  $form = drupal_get_form('vsite_import_form');
+
+  $output = render($form);
+
+  return $output;
+}
+
+
+function vsite_import_form($form, &$form_state) {
+
+  // This is the first form element. It's a textfield with a label, "Name"
+
+  $form['file'] = array(
+    '#type' => 'file',
+    '#title' => t('Vsite Export File'),
+    '#description' => t('Upload the Vsite Export file'),
+  );
+
+  $form['clone'] = array(
+    '#title' => t('Clone Vsite'),
+    '#type' => 'checkboxes',
+    '#description' => t('Create a clone of an existing vsite under a new name.'),
+    '#options' => array(
+      'clone' => t('Clone'),
+    ),
+  );
+
+  $form['name'] = array(
+    '#title' => t('Vsite Namespace'),
+    '#type' => 'textfield',
+    '#description' => t('The name of the new Vsite to avoid conflicts with .'),
+    '#size' => 60,
+    '#maxlength' => 125,
+    '#required' => FALSE,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+  );
+  return $form;
+}
+
+function vsite_import_form_submit($form, &$form_state) {
+
+  /*$file = $form_state['storage']['file'];
+  // We are done with the file, remove it from storage.
+  unset($form_state['storage']['file']);
+  // Make the storage of the file permanent
+  $file->status = FILE_STATUS_PERMANENT;
+  // Save file status.
+  file_save($file);
+
+  //TODO Link the file to a table mapping Files and Import processes
+
+
+  // - - -
+  drupal_set_message(t('The file has been uploaded for import processing.', array('@filename' => $file->filename)));*/
+}
+
+function vsite_import_form_validate($form, &$form_state)
+{
+
+/*  $file = file_save_upload('file', array(
+    'file_validate_is_image' => array(), // Validates file is really an image.
+    'file_validate_extensions' => array('gz'), // Validate extensions.
+  ));
+  // If the file passed validation:
+  if ($file) {
+    // Move the file, into the Drupal file system
+    if ($file = file_move($file, 'public://')) {
+      // Save the file for use in the submit handler.
+      $form_state['storage']['file'] = $file;
+    } else {
+      form_set_error('file', t('Failed to write the uploaded file to the site\'s file folder.'));
+    }
+  } else {
+    form_set_error('file', t('No file was uploaded.'));
+  }*/
+
+}
