@@ -178,29 +178,35 @@ function vsite_import_form_submit($form, &$form_state) {
 
   // Get location of import file
   $destination_folder = vsite_import_destination_folder($file);
-  // Decompress and Untar the file
-  $p = new PharData(drupal_realpath($file->uri));
-  $p->decompress(); // creates /path/to/my.tar
-  $p->extractTo(drupal_realpath($destination_folder));
 
-  $json_files = array();
-  foreach (glob(drupal_realpath($destination_folder) . "/*.json") as $json) {
-    $json_files[] = $json;
+  try {
+    // Decompress and Untar the file
+    $p = new PharData(drupal_realpath($file->uri));
+    $p->decompress(); // creates /path/to/my.tar
+    $p->extractTo(drupal_realpath($destination_folder));
+
+    $json_files = array();
+    foreach (glob(drupal_realpath($destination_folder) . "/*.json") as $json) {
+      $json_files[] = $json;
+    }
+  } catch (Exception $e) {
+    drupal_set_message("Unable to extract the tar.gz file", "error");
+    watchdog('vsite_import', "Error when extracting the tar.gz : $e");
   }
+
 
   $batch = array(
     'title' => t('Importing'),
     'finished' => 'vsite_import_finished_callback',
   );
 
-    if ( $handle = fopen($json_files[0], 'r') ) {
-      while ( $line = fgets($handle) ) {
-        $batch['operations'][] = array('_vsite_import_import_line', array($json_files[0], $form_state['values']['clone']['Clone'], $line));
-      }
+  if (!empty($json_files[0]) && $handle = fopen($json_files[0], 'r') ) {
+    while ( $line = fgets($handle) ) {
+      $batch['operations'][] = array('_vsite_import_import_line', array($json_files[0], $form_state['values']['clone']['Clone'], $line));
     }
     fclose($handle);
-
-  batch_set($batch);
+    batch_set($batch);
+  }
 }
 
 /*****************************************************************************
@@ -233,6 +239,10 @@ function vsite_import_destination_folder($file){
  */
 function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
+}
+
+function vsite_import_finished_callback($success, $results, $operations){
+  drupal_set_message('Your site has been imported');
 }
 /*****************************************************************************
 THEME
