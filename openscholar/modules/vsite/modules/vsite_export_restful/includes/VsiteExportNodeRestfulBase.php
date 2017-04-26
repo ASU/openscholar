@@ -40,6 +40,10 @@ class VsiteExportNodeRestfulBase extends RestfulEntityBaseNode {
       'sub_property' => 'value',
     );
 
+    $public_fields['type'] = array(
+      'property' => 'type',
+    );
+
     if (field_info_instance($this->getEntityType(), 'field_upload', $this->getBundle())) {
       $public_fields['field_upload'] = array(
         'property' => 'field_upload',
@@ -75,17 +79,19 @@ class VsiteExportNodeRestfulBase extends RestfulEntityBaseNode {
     return $public_fields;
   }
 
+  /* TODO use default handling. functionality is for admins only anyway.
   protected function checkEntityAccess($op, $entity_type, $entity) {
     $request = $this->getRequest();
-
-    if (isset($request['vsite'])) {
-      spaces_set_space(spaces_load('og', $request['vsite']));
-    }
 
     if (empty($entity->nid)) {
       // This is still a new node. Skip.
       return;
     }
+
+    if (isset($request['vsite'])) {
+      spaces_set_space(spaces_load('og', $request['vsite']));
+    }
+
 
     if ($is_group = og_is_group($entity_type, $entity)) {
       $group = $entity;
@@ -124,6 +130,7 @@ class VsiteExportNodeRestfulBase extends RestfulEntityBaseNode {
       }
     }
   }
+  */
 
   /**
    * Display the id and the title of the group.

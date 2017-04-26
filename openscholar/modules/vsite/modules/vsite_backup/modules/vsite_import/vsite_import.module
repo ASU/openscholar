@@ -239,6 +239,55 @@ function vsite_import_destination_folder($file){
  */
 function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
+  // A note on approach: We're handling a JSON formatted file in a very CSV
+  // sort of way. We can and do use this because
+  // 1. it's the protocol/formatting employed by our RESTful resources on export
+  // 2. it's the format we'll feed back into our RESTful resources on import
+  // 3. we control and guarantee the export file formatting (each line/row a
+  //    member of the fil's one large JSON array), so we can parse it line by
+  //    line
+  // 4. we get the low-memory benefit of line by line processing.
+
+  $context['results']['rows_imported']++;
+
+  // Trim off larger JSON array cruft. We treat each row as indpendent objects.
+  // Double quotes are essential for proper interpretation of trim() param.
+  $line = trim($line, "[], \t\n\r\0\x0B");
+
+
+
+
+
+
+
+  /**
+   * Simply show the import row count.
+   */
+  $context['message'] = t('Importing row !c', array( '!c' => $context['results']['rows_imported'] ));
+
+  /**
+   * Alternatively, our example CSV happens to have the title in the
+   * third column, so we can uncomment this line to display "Importing
+   * Blahblah" as each row is parsed.
+   *
+   * You can comment out the line above if you uncomment this one.
+   */
+  $context['message'] = t('Importing %title', array('%title' => $line[2]));
+
+  /**
+   * In order to slow importing and debug better, we can uncomment
+   * this line to make each import slightly slower.
+   */
+  usleep(2500);
+
+  /**
+   * If the first two columns in the row are "ROW", "FAILS" then we
+   * will add that row to the CSV we'll return to the importing person
+   * after the import completes.
+   */
+  if ( $line[1] == 'ROW' && $line[2] == 'FAILS' ) {
+    $context['results']['failed_rows'][] = $line ;
+  }
 }
 
 function vsite_import_finished_callback($success, $results, $operations){

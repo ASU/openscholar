@@ -115,6 +115,7 @@ class GroupNodeRestfulBase extends VsiteExportNodeRestfulBase {
   protected function setPropertyValues(EntityMetadataWrapper $wrapper, $null_missing_fields = FALSE) {
     $request = $this->getRequest();
     self::cleanRequest($request);
+//dpm($request); return;
     $wrapper->type->set($request['type']);
 
     parent::setPropertyValues($wrapper, $null_missing_fields);
@@ -138,4 +139,94 @@ class GroupNodeRestfulBase extends VsiteExportNodeRestfulBase {
       purl_save($modifier);
     }
   }
+
+
+
+  /**
+   * {@inheritdoc}
+   *
+   * Copied from RestfulEntityBase.
+   */
+  public function createEntity() {
+
+
+    // TODO does this extension even help? Or do we need to go to RestfulBase.process ?
+
+    $entity_info = $this->getEntityInfo();
+    $bundle_key = $entity_info['entity keys']['bundle'];
+    $values = $bundle_key ? array($bundle_key => $this->bundle) : array();
+//$request = $this->getRequest();
+//$values = array($request['type'] => $request);
+
+    $entity = entity_create($this->entityType, $values); // 'node'
+    //$entity = entity_create($request['type'], $values); // 'personal' etc.
+
+    if ($this->checkEntityAccess('create', $this->entityType, $entity) === FALSE) {
+      // User does not have access to create entity.
+      $params = array('@resource' => $this->getPluginKey('label'));
+      throw new RestfulForbiddenException(format_string('You do not have access to create a new @resource resource.', $params));
+    }
+
+    $wrapper = entity_metadata_wrapper($this->entityType, $entity);
+    //$wrapper = entity_metadata_wrapper($request['type'], $entity);
+
+
+//$values = array();
+//foreach ($wrapper->getPropertyInfo() as $key => $val) {
+//  $values[$key] = $wrapper->$key->value();
+//}
+
+//dpm($wrapper);
+//dpm($this->entityType);
+//dpm($entity);
+
+    $this->setPropertyValues($wrapper);
+
+    return array($this->viewEntity($wrapper->getIdentifier()));
+  }
+
+
+  /**
+   * {@inheritdoc}
+   *
+   * Copied from RestfulEntityBase.
+   */
+  public function process($path = '', array $request = array(), $method = \RestfulInterface::GET, $check_rate_limit = TRUE) {
+    $this->setMethod($method);
+    $this->setPath($path);
+    $this->setRequest($request);
+
+    // Clear all static caches from previous requests.
+    $this->staticCache->clearAll();
+
+    // Override the range with the value in the URL.
+    $this->overrideRange();
+
+    $version = $this->getVersion();
+    $this->setHttpHeaders('X-API-Version', 'v' . $version['major']  . '.' . $version['minor']);
+
+    if (!$method_name = $this->getControllerFromPath()) {
+      throw new RestfulBadRequestException('Path does not exist');
+    }
+
+    if ($check_rate_limit && $this->getRateLimitManager()) {
+      // This will throw the appropriate exception if needed.
+      $this->getRateLimitManager()->checkRateLimit($request);
+    }
+
+    $return = $this->{$method_name}($path);
+
+    if (empty($request['__application']['rest_call'])) {
+      // Switch back to the original user.
+      $this->getAuthenticationManager()->switchUserBack();
+    }
+
+
+    return $return;
+
+  }
+
+
+
+
 }
