@@ -250,10 +250,107 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
   $context['results']['rows_imported']++;
 
+
+// TODO add in clone/restore logic
+  // do restore as actual restore or do delete/refresh?
+
+
   // Trim off larger JSON array cruft. We treat each row as indpendent objects.
   // Double quotes are essential for proper interpretation of trim() param.
   $line = trim($line, "[], \t\n\r\0\x0B");
 
+  $item = drupal_json_decode($line);
+  $item_type = key($item);
+
+// TODO do another dispatch type thing as was done in exports or backup
+
+
+
+  // VSITE
+  if ($item_type == 'vsite') {
+
+    // TODO (ASU) add lab type RESTful resource
+
+    $handler = restful_get_restful_handler('group', $major = 2, $minor = 0);
+
+    foreach ($item as $key => $value) {
+
+      // POST method, to create.
+      $request = $value[0];
+      //dpm($request);
+      unset($request['id']);
+      $result = $handler->post('', $request);
+      $id = $result[0]['id'];
+
+    }
+  }
+
+
+
+// TODO handling for pathauto, file references, taxonomy term references, user references
+
+  // NODE
+  if ($item_type == 'node') {
+
+    $node_type = $item['node'][0]['type'];
+    $handler = restful_get_restful_handler($node_type, $major = 2, $minor = 0);
+
+    foreach ($item as $key => $value) {
+
+      // POST method, to create.
+      $request = $value[0];
+      unset($request['id']);
+      unset($request['self']);
+// TODO eventual handling for these two
+      unset($request['og_vocabulary']);
+      if (isset($request['field_upload'])) {
+        // TODO Do stuff here to record file mapping details for later...
+        unset($request['field_upload']);
+      }
+      $result = $handler->post('', $request);
+      $id = $result[0]['id'];
+    }
+  }
+
+
+
+  // TAXONOMY, global
+  if ($item_type == 'global_org_taxonomy') {
+
+    $handler = restful_get_restful_handler('taxonomy', $major = 2, $minor = 0);
+    $out = $handler->getRequest();
+    //dpm($out);
+
+    foreach ($item as $key => $value) {
+
+      // POST method, to create.
+      $request = $value[0];
+      //dpm($request);
+      unset($request['id']);
+      $result = $handler->post('', $request);
+      $id = $result[0]['id'];
+
+    }
+  }
+
+
+
+  // SPACES OVERRIDES
+  if ($item_type == 'spaces_overrides') {
+
+    $handler = restful_get_restful_handler('spacesOverrides', $major = 2, $minor = 0);
+    foreach ($item['spaces_overrides'] as $key => $value) {
+
+      // POST method, to create.
+      $request = $value;
+      // TODO unfinished
+      $request['id'] = '999';
+      $request['vsite'] = '999'; // Need the mapped/new ID before calling this one.
+      $result = $handler->post('', $request);
+      $id = $result[0]['id'];
+
+    }
+  }
 
 
 
@@ -278,7 +375,7 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
    * In order to slow importing and debug better, we can uncomment
    * this line to make each import slightly slower.
    */
-  usleep(2500);
+  //usleep(2500);
 
   /**
    * If the first two columns in the row are "ROW", "FAILS" then we
