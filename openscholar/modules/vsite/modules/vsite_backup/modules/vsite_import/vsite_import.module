@@ -317,9 +317,9 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   // TAXONOMY, global
   if ($item_type == 'global_org_taxonomy') {
 
-    $handler = restful_get_restful_handler('taxonomy', $major = 2, $minor = 0);
+    /* TODO Don't want/need to create global org. Anything to do here?
+    $handler = restful_get_restful_handler('vocabulary', $major = 2, $minor = 0);
     $out = $handler->getRequest();
-    //dpm($out);
 
     foreach ($item as $key => $value) {
 
@@ -331,7 +331,91 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       $id = $result[0]['id'];
 
     }
+    */
   }
+
+  // TAXONOMY and TERMS
+  if ($item_type == 'taxonomy') {
+
+    $handler = restful_get_restful_handler('vocabulary', $major = 2, $minor = 0);
+
+    // Pop the first item (vocab array) and create the taxonomy.
+    $vocab_item = array_shift($item['taxonomy']);
+
+    $request = $vocab_item;
+
+    // Should have a unique machine_name. If not, make one.
+    if (taxonomy_vocabulary_machine_name_load($request['machine_name'])) {
+      // We got a collision. Negotiate a different machine name.
+      $i = 0;
+      while (taxonomy_vocabulary_machine_name_load($request['machine_name'] . '_' . $i)) {
+        $i++;
+      }
+
+      $request['machine_name'] = $request['machine_name'] . '_' . $i;
+    }
+    unset($request['id']);
+    unset($request['self']);
+    unset($request['form']);
+    unset($request['tree']);
+    unset($request['bundles']);
+    // POST method, to create.
+    $result = $handler->post('', $request);
+    $vid = $result[0]['id'];
+
+    // Now iterate on the remaining items and create the terms.
+    $term_handler = restful_get_restful_handler('taxonomy', $major = 2, $minor = 0);
+
+// TODO For some reason we're missing hte first taxonomy term at this point in the process.
+
+    foreach ($item['taxonomy'] as $key => $value) {
+
+      // POST method, to create.
+      $request = $value;
+      unset($request['id']);
+      unset($request['self']);
+      // Set the vid to match our newly minted vocabulary.
+      $request['vid'] = $vid;
+      $result = $term_handler->post('', $request);
+      $id = $result[0]['id'];
+
+    }
+  }
+
+
+  // FILE
+  if ($item_type == 'file') {
+
+    $handler = restful_get_restful_handler('files', $major = 2, $minor = 0);
+
+    dpm($item);
+    foreach ($item['file'] as $key => $value) {
+      dpm($value);
+
+      // POST method, to create.
+      $request = $value;
+      unset($request['id']);
+      unset($request['self']);
+
+// TODO update path to reflect the file's location during import... then test again.
+
+      $result = $handler->post('', $request);
+      $id = $result[0]['id'];
+
+    }
+  }
+
+
+  // GLOBAL USER ROLES
+  // TODO We're not importing these... right? Just seems like a bad idea.
+
+  // GROUP USER ROLES
+
+
+  // USER
+
+
+  // VSITE LAYOUT BLOCKS
 
 
 
