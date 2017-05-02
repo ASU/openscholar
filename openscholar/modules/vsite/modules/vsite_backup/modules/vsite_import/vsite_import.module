@@ -175,7 +175,6 @@ function vsite_import_form_submit($form, &$form_state) {
   $file->status = FILE_STATUS_PERMANENT;
   // Save file status.
   $file = file_save($file);
-
   // Get location of import file
   $destination_folder = vsite_import_destination_folder($file);
 
@@ -189,6 +188,7 @@ function vsite_import_form_submit($form, &$form_state) {
     foreach (glob(drupal_realpath($destination_folder) . "/*.json") as $json) {
       $json_files[] = $json;
     }
+    $all_files = _vsite_import_crawl_unpacked(drupal_realpath($destination_folder));
   } catch (Exception $e) {
     drupal_set_message("Unable to extract the tar.gz file", "error");
     watchdog('vsite_import', "Error when extracting the tar.gz : $e");
@@ -202,8 +202,9 @@ function vsite_import_form_submit($form, &$form_state) {
 
   if (!empty($json_files[0]) && $handle = fopen($json_files[0], 'r') ) {
     while ( $line = fgets($handle) ) {
-      $batch['operations'][] = array('_vsite_import_import_line', array($json_files[0], $form_state['values']['clone']['Clone'], $line));
+//      $batch['operations'][] = array('_vsite_import_import_line', array($json_files[0], $form_state['values']['clone']['Clone'], $line));
     }
+    $batch['operations'][] = array('_vsite_import_track_unpacked_file', array($file, $all_files));
     fclose($handle);
     batch_set($batch);
   }
@@ -212,6 +213,35 @@ function vsite_import_form_submit($form, &$form_state) {
 /*****************************************************************************
 INTERNAL
  ******************************************************************************/
+
+/**
+ * Crawl unpacked files in a directory and return them in an array.
+ *
+ * @param $directory Directory to be crawled
+ * @param array $items Variable to be referenced internally before returning
+ * @return array Array being returned
+ */
+function _vsite_import_crawl_unpacked($directory,  &$items = array()){
+
+    foreach(glob("{$directory}/*") as $file)
+    {
+      if(is_dir($file)) {
+        if(!isset($items['dirs'])){
+          $items['dirs'] = array();
+        }
+        array_push($items['dirs'], $file);
+        _vsite_import_crawl_unpacked($file, $items);
+      } else {
+        if(!isset($items['files'])){
+          $items['files'] = array();
+        }
+        array_push($items['files'], $file);
+      }
+    }
+    return $items;
+}
+
+
 /**
  * Generate a destination folder for the file being imported
  *
@@ -227,6 +257,18 @@ function vsite_import_destination_folder($file){
 
   return $destination_folder;
 
+}
+
+/**
+ * Batch operation to track all files unpacked and uploaded to the DB
+ *
+ * @param $file
+ * @param $all_files
+ * @param $context
+ */
+function _vsite_import_track_unpacked_file($file, $all_files, &$context){
+  $context['results']['file'] = $file;
+  $context['results']['all_files'] = $all_files;
 }
 
 /**
@@ -471,14 +513,45 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   }
 }
 
+/**
+ * Batch callback for completion of batch process
+ *
+ * @param $success
+ * @param $results
+ * @param $operations
+ */
 function vsite_import_finished_callback($success, $results, $operations){
 
   if ($success) {
+    // Attempt to remove the files used for the import
+    try {
+      foreach($results['all_files']['files'] as $file)
+      {
+        if (strpos($file,"vsite-imports")) {
+          unlink($file);
+        }
+      }
+      foreach($results['all_files']['dirs'] as $file)
+      {
+        if (strpos($file,"vsite-imports")) {
+          rmdir($file);
+        }
+      }
 
-    // TODO cleanup the extra files here
+      // Delete Drupal's reference to the tar.gz file
+      $file = file_load($results['file']->fid);
+      file_delete($file);
+      // Delete the container folder
+      if(strpos(dirname(drupal_realpath($results['file']->uri)), "vsite-imports")){
+        $dirname = dirname(drupal_realpath($results['file']->uri));
+        rmdir($dirname);
+      }
 
-
-    drupal_set_message('Your site has been imported');
+      drupal_set_message('Your site has been imported');
+    } catch(Exception $e) {
+      drupal_set_message("Error: Failed to clean up the import files", "error");
+      watchdog("vsite_import","Failed to clean up the import files: $e");
+    }
   }
   else {
 
