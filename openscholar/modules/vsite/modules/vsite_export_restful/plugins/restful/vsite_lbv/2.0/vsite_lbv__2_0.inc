@@ -6,11 +6,13 @@ $plugin = array(
   'resource' => 'layouts',
   'major_version' => 2,
   'minor_version' => 0,
-  'class' => 'VsiteExportRestfulLayout',
+  'class' => 'VsiteExportRestfulLayoutsOverrides',
+
   'data_provider_options' => array(
-    'table_name' => 'spaces_overrides',
-    'id_column' => array('object_type', 'object_id', 'id'), // These columns don't exist in this table.
+    'table_name' => 'vsite_layout_block',
+    'id_column' => array('sid', 'delta', 'module', 'context'),
   ),
+
   'authentication_types' => TRUE,
   'authentication_optional' => FALSE,
   'discoverable' => FALSE,

@@ -581,8 +581,8 @@ function vsite_backup_export_prep_vsite($data) {
   $id = $data['vsite_id'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
-$account = user_load(1);
-$handler->setAccount($account);
+  $account = user_load(1);
+  $handler->setAccount($account);
   $result = $handler->get($id);
 
   return $result;
@@ -595,8 +595,8 @@ function vsite_backup_export_prep_global_org_taxonomy($data) {
   $id = $data['item']['vid'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
-$account = user_load(1);
-$handler->setAccount($account);
+  $account = user_load(1);
+  $handler->setAccount($account);
   $result = $handler->get($id);
 
   // Just need for mappings, so don't get terms.
@@ -610,8 +610,8 @@ function vsite_backup_export_prep_taxonomy($data) {
   $id = $data['item']['vid'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
-$account = user_load(1);
-$handler->setAccount($account);
+  $account = user_load(1);
+  $handler->setAccount($account);
   $result = $handler->get($id);
 
   // Get terms
@@ -625,7 +625,7 @@ $handler->setAccount($account);
   $tax_request['vid'] = $result[0]['id'];
 
   $tax_handler = restful_get_restful_handler($tax_resource_name, $major_version = 2, $minor_version = 0);
-$tax_handler->setAccount($account);
+  $tax_handler->setAccount($account);
   $tax_result = $tax_handler->get($tax_id, $tax_request);
 
   // First item in array is vocabulary, all following are terms.
@@ -643,8 +643,8 @@ function vsite_backup_export_prep_file($data) {
   $eid = $data['eid'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
-$account = user_load(1);
-$handler->setAccount($account);
+  $account = user_load(1);
+  $handler->setAccount($account);
   $result = $handler->get($id);
 
   // Backup files destination.
@@ -678,8 +678,8 @@ function vsite_backup_export_prep_group_user_roles($data) {
   $vsite_id = $data['vsite_id'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
-$account = user_load(1);
-$handler->setAccount($account);
+  $account = user_load(1);
+  $handler->setAccount($account);
   $request = array();
   $request['vsite'] = $vsite_id;
   $result = $handler->get($id, $request);
@@ -694,8 +694,8 @@ function vsite_backup_export_prep_user($data) {
   $id = $data['item']['entity_id'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
-$account = user_load(1);
-$handler->setAccount($account);
+  $account = user_load(1);
+  $handler->setAccount($account);
   $result = $handler->get($id);
 
   return $result;
@@ -710,8 +710,8 @@ function vsite_backup_export_prep_node($data) {
   $id = $data['item']['entity_id'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
-$account = user_load(1);
-$handler->setAccount($account);
+  $account = user_load(1);
+  $handler->setAccount($account);
   $result = $handler->get($id);
 
   return $result;
@@ -722,11 +722,12 @@ function vsite_backup_export_prep_vsite_layout_blocks($data) {
   // resource.
 
   $resource_name = 'layouts';
-  $vsite_id = $data['vsite_id'];
+  // Use the first item for this value. All are keyed off it, so safe to do.
+  $vsite_id = $data['item']['vsite_layout_blocks'][0];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
-$account = user_load(1);
-$handler->setAccount($account);
+  $account = user_load(1);
+  $handler->setAccount($account);
   $request = array();
   $request['vsite'] = $vsite_id;
   $result = $handler->get('', $request);
@@ -742,8 +743,8 @@ function vsite_backup_export_prep_spaces_overrides($data) {
   $vsite_id = $data['vsite_id'];
 
   $handler = restful_get_restful_handler($resource_name, $major_version = 2, $minor_version = 0);
-$account = user_load(1);
-$handler->setAccount($account);
+  $account = user_load(1);
+  $handler->setAccount($account);
   $request = array();
   $request['vsite'] = $vsite_id;
   $result = $handler->get('', $request);

@@ -11,4 +11,5 @@ files[] = includes/VsiteExportObjectValidate.php
 files[] = includes/VsiteExportRestfulDataProvider.php
 files[] = includes/VsiteExportRestfulReports.php
 files[] = includes/VsiteExportRestfulSpaces.php
+files[] = includes/VsiteExportRestfulLayouts.php
 files[] = includes/VsiteExportRestfulCPMenu.php

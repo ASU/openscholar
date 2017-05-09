@@ -48,7 +48,7 @@ abstract class VsiteExportRestfulDataProvider extends \RestfulDataProviderDbQuer
 
     $errors_output = array();
     if (!$result) {
-      $e = new \RestfulBadRequestException("It's look that you sent a request with bad values.");
+//      $e = new \RestfulBadRequestException("It's look that you sent a request with bad values.");
       $fields_errors = $handler->getErrors(FALSE);
       foreach ($fields_errors as $field => $errors) {
 
@@ -56,10 +56,10 @@ abstract class VsiteExportRestfulDataProvider extends \RestfulDataProviderDbQuer
           $errors_output[$field][] = format_string($error['message'], $error['params']);
         }
 
-        $e->addFieldError($field, implode(', ', $errors_output[$field]));
+//        $e->addFieldError($field, implode(', ', $errors_output[$field]));
       }
 
-      throw $e;
+//      throw $e;
     }
   }
 

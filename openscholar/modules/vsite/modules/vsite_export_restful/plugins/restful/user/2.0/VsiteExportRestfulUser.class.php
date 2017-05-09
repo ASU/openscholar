@@ -128,4 +128,91 @@ class VsiteExportRestfulUser extends \RestfulEntityBaseUser {
       ->fetchAllKeyed(0, 1);
     return $result;
   }
+
+
+   /**
+   * Set properties of the entity based on the request, and save the entity.
+   *
+   * @param EntityMetadataWrapper $wrapper
+   *   The wrapped entity object, passed by reference.
+   * @param bool $null_missing_fields
+   *   Determine if properties that are missing from the request array should
+   *   be treated as NULL, or should be skipped. Defaults to FALSE, which will
+   *   skip, instead of setting the fields to NULL.
+   *
+   * @throws RestfulBadRequestException
+   */
+  protected function setPropertyValues(EntityMetadataWrapper $wrapper, $null_missing_fields = FALSE) {
+    $request = $this->getRequest();
+
+    static::cleanRequest($request);
+    $save = FALSE;
+    $original_request = $request;
+
+    foreach ($this->getPublicFields() as $public_field_name => $info) {
+      if (!empty($info['create_or_update_passthrough'])) {
+        // Allow passing the value in the request.
+        unset($original_request[$public_field_name]);
+        continue;
+      }
+
+      if (empty($info['property'])) {
+        // We may have for example an entity with no label property, but with a
+        // label callback. In that case the $info['property'] won't exist, so
+        // we skip this field.
+        continue;
+      }
+
+      $property_name = $info['property'];
+
+      if (!array_key_exists($public_field_name, $request)) {
+        // No property to set in the request.
+        if ($null_missing_fields && $this->checkPropertyAccess('edit', $public_field_name, $wrapper->{$property_name}, $wrapper)) {
+          // We need to set the value to NULL.
+          $field_value = NULL;
+        }
+        else {
+          // Either we shouldn't set missing fields as NULL or access is denied
+          // for the current property, hence we skip.
+          continue;
+        }
+      }
+      else {
+        // Property is set in the request.
+        $field_value = $this->propertyValuesPreprocess($property_name, $request[$public_field_name], $public_field_name);
+      }
+
+      $wrapper->{$property_name}->set($field_value);
+
+      // We check the property access only after setting the values, as the
+      // access callback's response might change according to the field value.
+      if (!$this->checkPropertyAccess('edit', $public_field_name, $wrapper->{$property_name}, $wrapper)) {
+        throw new \RestfulBadRequestException(format_string('Property @name cannot be set.', array('@name' => $public_field_name)));
+      }
+
+      unset($original_request[$public_field_name]);
+      $save = TRUE;
+    }
+
+    if (!$save) {
+      // No request was sent.
+      throw new \RestfulBadRequestException('No values were sent with the request');
+    }
+
+    if ($original_request) {
+      // Request had illegal values.
+      $error_message = format_plural(count($original_request), 'Property @names is invalid.', 'Property @names are invalid.', array('@names' => implode(', ', array_keys($original_request))));
+      throw new RestfulBadRequestException($error_message);
+    }
+
+    // Allow changing the entity just before it's saved. For example, setting
+    // the author of the node entity.
+    $this->entityPreSave($wrapper);
+
+    $this->entityValidate($wrapper);
+
+    $wrapper->save();
+  }
+
+
 }

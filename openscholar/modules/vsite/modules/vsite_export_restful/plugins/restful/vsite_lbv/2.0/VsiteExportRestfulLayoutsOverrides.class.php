@@ -2,10 +2,10 @@
 
 /**
  * @file
- * Contains \VsiteExportRestfulLayout
+ * Contains \VsiteExportRestfulLayouts
  */
 
-class VsiteExportRestfulLayout extends \VsiteExportRestfulSpaces {
+class VsiteExportRestfulLayoutsOverrides extends \VsiteExportRestfulLayouts {
 
   protected $validateHandler = 'layouts';
   protected $objectType = 'context';
@@ -14,6 +14,8 @@ class VsiteExportRestfulLayout extends \VsiteExportRestfulSpaces {
    * Verify the user have access to the manage layout.
    */
   public function checkGroupAccess() {
+// TODO Work out better access check override/logic
+return TRUE;
     if (parent::checkGroupAccess()) {
       return TRUE;
     }
@@ -29,7 +31,7 @@ class VsiteExportRestfulLayout extends \VsiteExportRestfulSpaces {
   }
 
   /**
-   * Updating a given space override.
+   * Updating a given layout.
    *
    * type: PUT
    * values: {
@@ -42,7 +44,7 @@ class VsiteExportRestfulLayout extends \VsiteExportRestfulSpaces {
    *  ]
    * }
    */
-  public function updateSpace() {
+  public function updateLayout() {
     // Check group access.
     $this->checkGroupAccess();
 
@@ -52,6 +54,7 @@ class VsiteExportRestfulLayout extends \VsiteExportRestfulSpaces {
     // Set up the blocks layout.
     ctools_include('layout', 'os');
 
+// TODO layout field/object mapping
     $blocks = os_layout_get($this->object->object_id, FALSE, FALSE, $this->space);
 
     foreach ($blocks as $delta => $block) {
@@ -67,7 +70,7 @@ class VsiteExportRestfulLayout extends \VsiteExportRestfulSpaces {
   }
 
   /**
-   * Creating a space override.
+   * Creating a vsite layout.
    *
    * type: POST
    * values: {
@@ -84,28 +87,31 @@ class VsiteExportRestfulLayout extends \VsiteExportRestfulSpaces {
    *  ]
    * }
    */
-  public function createSpace() {
+  public function createLayout() {
+
     // Check group access.
     $this->checkGroupAccess();
 
     // Validate the object from the request.
     $this->validate();
 
-    if (!isset($this->object->blocks['os_pages-main_content'])) {
-      // When creating the layout override we need the page content.
-      $this->object->blocks['os_pages-main_content'] = array(
-        'module' => "os_pages",
-        'delta' => "main_content",
-        'region' => "content_top",
-      );
-    }
+    // Save the blocks layout.
 
-    // Set up the blocks layout.
     ctools_include('layout', 'os');
 
-    os_layout_set($this->object->object_id, $this->object->blocks, $this->space);
+    foreach ($this->request as $context_name => $layout) {
 
-    return $this->object->blocks;
+      if (is_array($layout)) {
+
+        foreach ($layout as $key => $block) {
+
+          drupal_write_record('vsite_layout_block', $block);
+
+        }
+      }
+    }
+
+    return t('success'); //$this->object->blocks;
   }
 
   /**
@@ -118,13 +124,15 @@ class VsiteExportRestfulLayout extends \VsiteExportRestfulSpaces {
    *  delta: boxes-1419335380
    * }
    */
-  public function deleteSpace() {
+  public function deleteLayout() {
+
     // Check group access.
     $this->checkGroupAccess();
 
-    db_delete('spaces_overrides')
-      ->condition('object_id', $this->object->object_id)
-      ->condition('id', $this->object->vsite)
+    db_delete('vsite_layout_block')
+      ->condition('sid', $this->request['vsite']['sid'])
+      //->condition('sd', $this->object->object_id)
+      //->condition('id', $this->object->vsite)
       ->execute();
   }
 
@@ -136,30 +144,49 @@ class VsiteExportRestfulLayout extends \VsiteExportRestfulSpaces {
    *  vsite: 2
    * }
    */
-  public function getSpace() {
+  public function getLayout() {
+
     // Check group access.
     $this->checkGroupAccess();
 
+
     $layouts = [];
+    if($this->request['vsite']['sid'] && is_numeric($this->request['vsite']['sid'])){
 
-    if($this->object->vsite && is_numeric($this->object->vsite)){
-
+      /*
       $vlb = db_select('vsite_layout_block', 'v')
-        ->condition('v.sid', $this->object->vsite, '=')
+        ->condition('v.sid', $this->request['vsite']['sid'], '=')
         ->fields('v', array('delta', 'context', 'module', 'region', 'weight'))
         ->execute();
 
       $layouts['vsite_layout_block'] = $vlb->fetchAll();
+      */
 
-      if(sizeof($layouts['vsite_layout_block']) > 0){
-        return $layouts;
-      } else {
-        watchdog('vsite_export', 'Empty Space/Layout configuration in export request for Vsite ' . $this->object->vsite);
-        return array();
+      ctools_include('layout', 'os');
+
+      $contexts = os_layout_get_contexts($privacy = array(1, 2), $user_created = TRUE);
+
+      $vsite_id = $this->request['vsite']['sid'];
+      $vsite_space =  spaces_load($type = 'og', $vsite_id, $reset = TRUE);
+
+      $layouts['vsite_layout_block'] = array();
+      foreach ($contexts as $context_name => $context_value) {
+        $layouts['vsite_layout_block'][$context_name] = os_layout_get($context_name, $load_meta = FALSE, $unused_blocks = FALSE, $space = $vsite_space);
+        // Add in the bits needed for vsite_layout_block records.
+        foreach ($layouts['vsite_layout_block'][$context_name] as $k => $v) {
+          $layouts['vsite_layout_block'][$context_name][$k]['sid'] = $vsite_id;
+          $layouts['vsite_layout_block'][$context_name][$k]['context'] = $context_name;
+        }
       }
 
+      if (sizeof($layouts['vsite_layout_block']) > 0){
+        return $layouts;
+      } else {
+        watchdog('vsite_export', t('Empty Layout configuration in export request for Vsite @vsite'), array('@vsite' => $this->object->vsite));
+        return array();
+      }
     } else {
-      watchdog('vsite_export', 'Vsite Export RESTful endpoint receiving non-integer vsite ID');
+      watchdog('vsite_export', t('Vsite Export RESTful endpoint receiving non-integer Vsite ID'));
       return array();
     }
 

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \VsiteExportRestfulLayout
+ * Contains \VsiteExportRestfulSpaces
  */
 
 class VsiteExportRestfulSpacesOverrides extends \VsiteExportRestfulSpaces {
@@ -86,26 +86,25 @@ class VsiteExportRestfulSpacesOverrides extends \VsiteExportRestfulSpaces {
    */
   public function createSpace() {
     // Check group access.
-    $this->checkGroupAccess();
+// TODO  use this resolution to access check for all import resources? or use their method... or?
+//    $this->checkGroupAccess();
 
     // Validate the object from the request.
     $this->validate();
 
-    if (!isset($this->object->blocks['os_pages-main_content'])) {
-      // When creating the layout override we need the page content.
-      $this->object->blocks['os_pages-main_content'] = array(
-        'module' => "os_pages",
-        'delta' => "main_content",
-        'region' => "content_top",
-      );
-    }
-
-    // Set up the blocks layout.
     ctools_include('layout', 'os');
 
-    os_layout_set($this->object->object_id, $this->object->blocks, $this->space);
+    foreach ($this->request as $name => $overrides) {
 
-    return $this->object->blocks;
+      if (is_array($overrides)) {
+
+        // TODO update $override['id'] value with new vsite id.
+        drupal_write_record('spaces_overrides', $overrides);
+
+      }
+    }
+
+    return t('Success'); //$this->object->blocks;
   }
 
   /**
@@ -145,7 +144,7 @@ class VsiteExportRestfulSpacesOverrides extends \VsiteExportRestfulSpaces {
     if($this->object->vsite && is_numeric($this->object->vsite)){
       $spaces = db_select('spaces_overrides', 's')
         ->condition('s.id', $this->object->vsite, '=')
-        ->fields('s',array('value', 'object_id', 'object_type', 'id'))
+        ->fields('s',array('value', 'object_id', 'object_type', 'id', 'type'))
         ->execute();
       $layouts['spaces_overrides'] = $spaces->fetchAll();
 

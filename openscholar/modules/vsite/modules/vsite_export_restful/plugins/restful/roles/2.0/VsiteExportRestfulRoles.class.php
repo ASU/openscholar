@@ -66,11 +66,14 @@ class VsiteExportRestfulRoles extends \VsiteExportRestfulDataProvider {
 
     $request = $this->getRequest();
 
-    if (empty($request['vsite'])) {
-      throw new \RestfulForbiddenException('You must specify a vsite ID.');
-    }
+// TODO lookup from mappings table and set
+//    if (empty($request['vsite'])) {
+//      throw new \RestfulForbiddenException('You must specify a vsite ID.');
+//    }
+
 
     $wrapper = entity_metadata_wrapper('node', $request['vsite']);
+//$wrapper = entity_metadata_wrapper('node', '4');
 
     if ($wrapper->og_roles_permissions->value()) {
       // The group override OG's default roles and permission. we need to return
@@ -90,9 +93,72 @@ class VsiteExportRestfulRoles extends \VsiteExportRestfulDataProvider {
    *
    * Verify the uer have permission to invoke this method.
    */
+//  public function create() {
+//    $this->validate();
+//    return parent::create();
+//  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function create() {
-    $this->validate();
-    return parent::create();
+$this->validate();
+    $request = $this->getRequest();
+    static::cleanRequest($request);
+    $save = FALSE;
+    $original_request = $request;
+
+    $public_fields = $this->getPublicFields();
+    $id_columns = $this->getIdColumn();
+
+
+    $record = array();
+    foreach ($public_fields as $public_field_name => $info) {
+      // Ignore passthrough public fields.
+      if (!empty($info['create_or_update_passthrough'])) {
+        unset($original_request[$public_field_name]);
+        continue;
+      }
+
+      // If this is the primary field, skip.
+      if ($this->isPrimaryField($info['property'])) {
+        unset($original_request[$public_field_name]);
+        continue;
+      }
+
+      if (isset($request[$public_field_name])) {
+        $record[$info['property']] = $request[$public_field_name];
+      }
+
+      unset($original_request[$public_field_name]);
+      $save = TRUE;
+    }
+
+    // No request was sent.
+    if (!$save) {
+      throw new \RestfulBadRequestException('No values were sent with the request.');
+    }
+
+//dpm($original_request);
+    // If the original request is not empty, then illegal values are present.
+    if (!empty($original_request)) {
+      $error_message = format_plural(count($original_request), 'Property @names is invalid.', 'Property @names are invalid.', array('@names' => implode(', ', array_keys($original_request))));
+      throw new \RestfulBadRequestException($error_message);
+    }
+
+    // Once the record is built, write it and view it.
+    if (drupal_write_record($this->getTableName(), $record)) {
+      // Handle multiple id columns.
+      $id_values = array();
+      foreach ($id_columns as $id_column) {
+        $id_values[$id_column] = $record[$id_column];
+      }
+      $id = implode(self::COLUMN_IDS_SEPARATOR, $id_values);
+
+      return $this->view($id);
+    }
+    return;
+
   }
 
   /**

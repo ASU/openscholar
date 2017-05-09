@@ -293,6 +293,10 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   $context['results']['rows_imported']++;
 
 
+// TODO store vsite_id in context, so it can be fed to the handlers when not already stored in a line.
+  // TODO see the vsite_layout_blocks call.
+
+
 // TODO add in clone/restore logic
   // do restore as actual restore or do delete/refresh?
 
@@ -430,9 +434,7 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
     $handler = restful_get_restful_handler('files', $major = 2, $minor = 0);
 
-    dpm($item);
     foreach ($item['file'] as $key => $value) {
-      dpm($value);
 
       // POST method, to create.
       $request = $value;
@@ -452,12 +454,103 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   // TODO We're not importing these... right? Just seems like a bad idea.
 
   // GROUP USER ROLES
+  if ($item_type == 'group_user_roles') {
+
+
+    $handler = restful_get_restful_handler('roles', $major = 2, $minor = 0);
+
+    foreach ($item['group_user_roles'] as $key => $value) {
+
+      // POST method, to create.
+      $request = $value;
+// TODO need to get $request['vsite'] mapping value squared away for these.
+// TODO see VsiteExportRestfulRoles.class.php TODO comments.
+//$request['vsite'] = 15;
+      unset($request['id']);
+      unset($request['self']);
+      unset($request['rid']);
+      unset($request['og_roles_permissions']);
+      $result = $handler->post('', $request);
+      $id = $result[0]['id'];
+
+    }
+  }
 
 
   // USER
+  if ($item_type == 'user') {
+
+    $handler = restful_get_restful_handler('users', $major = 2, $minor = 0);
+    foreach ($item['user'] as $key => $value) {
+
+      // POST method, to create after checking existence.
+      $request = $value;
+
+// TODO write our own hook_vsite_import_user()
+
+      // Allow for hook_vsite_import_user() to completely override user creation
+      // process. If you use CAS or some other user provisioning service, this
+      // is what you want.
+      if (module_implements('vsite_import_user')) {
+
+        module_invoke_all('vsite_import_user', $request);
+
+      }
+      // Default user intake.
+      else {
+
+        // Check email. If exists, do nothing but save to mappings.
+        if ($mail_acct = user_load_by_mail($request['mail'])) {
+
+          // TODO write to mappings
+
+        }
+        else {
+
+          // Should have a unique user name. If not, make it so.
+          if (user_load_by_name($request['name'])) {
+            // We got a collision on the name (but not email). Negotiate a
+            // different user name.
+            drupal_set_message(t('A user with the name @name but a different email already exists username was altered with a number to be unique.', array('@name' => $request['name'])));
+            $i = 0;
+            while (user_load_by_name($request['name'] . $i)) {
+              $i++;
+            }
+
+            $request['name'] = $request['name'] . $i;
+          }
+
+          // TODO write to mappings
+
+          // User doesn't exist. Create.
+          unset($request['id']);
+          unset($request['uid']);
+          unset($request['self']);
+          unset($request['create_access']);
+          $result = $handler->post('', $request);
+          $id = $result[0]['id'];
+
+
+        }
+      }
+    }
+  }
 
 
   // VSITE LAYOUT BLOCKS
+  if ($item_type == 'vsite_layout_blocks') {
+
+    $handler = restful_get_restful_handler('layouts', $major = 2, $minor = 0);
+    foreach ($item['vsite_layout_blocks'] as $key => $value) {
+
+      // POST method, to create.
+      $request = $value;
+      unset($request['id']);
+      $result = $handler->post('', $request);
+      $id = $result[0]['id'];
+
+    }
+  }
 
 
 
@@ -470,8 +563,8 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       // POST method, to create.
       $request = $value;
       // TODO unfinished
-      $request['id'] = '999';
-      $request['vsite'] = '999'; // Need the mapped/new ID before calling this one.
+      //$request['id'] = '999';
+      //$request['vsite'] = '999'; // Need the mapped/new ID before calling this one.
       $result = $handler->post('', $request);
       $id = $result[0]['id'];
 
