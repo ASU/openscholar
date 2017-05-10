@@ -104,7 +104,7 @@ class VsiteExportRestfulSpacesOverrides extends \VsiteExportRestfulSpaces {
       }
     }
 
-    return t('Success'); //$this->object->blocks;
+    return TRUE;
   }
 
   /**

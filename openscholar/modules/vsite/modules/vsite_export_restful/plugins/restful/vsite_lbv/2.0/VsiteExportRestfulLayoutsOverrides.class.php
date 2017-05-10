@@ -111,7 +111,7 @@ return TRUE;
       }
     }
 
-    return t('success'); //$this->object->blocks;
+    return TRUE;
   }
 
   /**

@@ -115,7 +115,6 @@ class GroupNodeRestfulBase extends VsiteExportNodeRestfulBase {
   protected function setPropertyValues(EntityMetadataWrapper $wrapper, $null_missing_fields = FALSE) {
     $request = $this->getRequest();
     self::cleanRequest($request);
-//dpm($request); return;
     $wrapper->type->set($request['type']);
 
     parent::setPropertyValues($wrapper, $null_missing_fields);
@@ -169,14 +168,6 @@ class GroupNodeRestfulBase extends VsiteExportNodeRestfulBase {
     //$entity = entity_create($this->entityType, $values); // 'node'
     //$entity = entity_create($request['type'], $values); // 'personal' etc.
 
-    dpm($entity_info);
-    dpm($bundle_key); // 'type'
-    dpm($entity);
-    dpm($values);
-    dpm($this->entityType);
-    dpm(get_object_vars($this)); // ->bundle is showing as false...
-    dpm($this->request['type']);
-    dpm($this->request);
 
 //    if ($this->checkEntityAccess('create', $this->entityType, $entity) === FALSE) {
       // User does not have access to create entity.
@@ -192,10 +183,6 @@ class GroupNodeRestfulBase extends VsiteExportNodeRestfulBase {
 //foreach ($wrapper->getPropertyInfo() as $key => $val) {
 //  $values[$key] = $wrapper->$key->value();
 //}
-
-//dpm($wrapper);
-//dpm($this->entityType);
-//dpm($entity);
 
     $this->setPropertyValues($wrapper);
 
@@ -271,11 +258,6 @@ class GroupNodeRestfulBase extends VsiteExportNodeRestfulBase {
     }
 
     $errors = $handler->getErrors(FALSE);
-
-// TODO errors being thrown:
-//   A site with this address already exists.
-//   The site address has invalid characters.
-dpm($errors);
 
     $map = array();
     foreach ($this->getPublicFields() as $field_name => $value) {

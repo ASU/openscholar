@@ -293,10 +293,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   $context['results']['rows_imported']++;
 
 
-// TODO store vsite_id in context, so it can be fed to the handlers when not already stored in a line.
-  // TODO see the vsite_layout_blocks call.
-
-
 // TODO add in clone/restore logic
   // do restore as actual restore or do delete/refresh?
 
@@ -308,8 +304,16 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   $item = drupal_json_decode($line);
   $item_type = key($item);
 
-// TODO do another dispatch type thing as was done in exports or backup
 
+// TODO do another dispatch type thing as was done in exports or backup?
+
+
+  // TODO if values stored in $context['sandbox']['*_vsite_id'] vars persist, the below note can become obsolete.
+  // Important Note: With imports, only one import should be done at a time.
+  // this is a limitation of the modules, and due to the fact that multiple
+  // imports could bear similar mappings values but be from different sites.
+  // Because we use batch import, we don't log an import ID, and thus don't
+  // track a means of differentiating mapping records.
 
 
   // VSITE
@@ -323,17 +327,31 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
       // POST method, to create.
       $request = $value[0];
-      //dpm($request);
+      $old_id = $request['id'];
       unset($request['id']);
       $result = $handler->post('', $request);
-      $id = $result[0]['id'];
+      $new_id = $result[0]['id'];
 
+      // Persist these in the batch.
+      $context['sandbox']['old_vsite_id'] = $old_id;
+      $context['sandbox']['new_vsite_id'] = $new_id;
+
+      /*
+Auto   * Action ID: Auto-incrementing value that points to every change tracked by the mappings table
+x      * Import ID: ID of the complete import being performed
+x      * Export ID: The ID of the export file being used
+      * Type: The type of item being mapped. Should probably be verbose enough to point to a specific table ex. taxonomy, node
+?      * Column: Point to the column being updated inside of the table referenced by {type}
+      * Export Item ID: The ID pulled from the export file
+      * Import Item ID: The ID being mapped to
+      */
     }
   }
 
 
 
 // TODO handling for pathauto, file references, taxonomy term references, user references
+
 
   // NODE
   if ($item_type == 'node') {
@@ -345,16 +363,17 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
       // POST method, to create.
       $request = $value[0];
+      $old_id = $request['id'];
       unset($request['id']);
       unset($request['self']);
-// TODO eventual handling for these two
+      // TODO eventual handling for these two
       unset($request['og_vocabulary']);
       if (isset($request['field_upload'])) {
         // TODO Do stuff here to record file mapping details for later...
         unset($request['field_upload']);
       }
       $result = $handler->post('', $request);
-      $id = $result[0]['id'];
+      $new_id = $result[0]['id'];
     }
   }
 
@@ -400,6 +419,7 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
       $request['machine_name'] = $request['machine_name'] . '_' . $i;
     }
+    $old_id = $request['id'];
     unset($request['id']);
     unset($request['self']);
     unset($request['form']);
@@ -408,6 +428,7 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
     // POST method, to create.
     $result = $handler->post('', $request);
     $vid = $result[0]['id'];
+    $new_id = $result[0]['id'];
 
     // Now iterate on the remaining items and create the terms.
     $term_handler = restful_get_restful_handler('taxonomy', $major = 2, $minor = 0);
@@ -417,13 +438,14 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
     foreach ($item['taxonomy'] as $key => $value) {
 
       // POST method, to create.
-      $request = $value;
-      unset($request['id']);
-      unset($request['self']);
+      $term_request = $value;
+      $old_term_ids[] = $term_request['id'];
+      unset($term_request['id']);
+      unset($term_request['self']);
       // Set the vid to match our newly minted vocabulary.
-      $request['vid'] = $vid;
-      $result = $term_handler->post('', $request);
-      $id = $result[0]['id'];
+      $term_request['vid'] = $vid;
+      $result = $term_handler->post('', $term_request);
+      $new_term_ids[] = $result[0]['id'];
 
     }
   }
@@ -438,13 +460,14 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
       // POST method, to create.
       $request = $value;
+      $old_id = $request['id'];
       unset($request['id']);
       unset($request['self']);
 
-// TODO update path to reflect the file's location during import... then test again.
+      // TODO update path to reflect the file's location during import... then test again.
 
       $result = $handler->post('', $request);
-      $id = $result[0]['id'];
+      $new_id = $result[0]['id'];
 
     }
   }
@@ -466,12 +489,13 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 // TODO need to get $request['vsite'] mapping value squared away for these.
 // TODO see VsiteExportRestfulRoles.class.php TODO comments.
 //$request['vsite'] = 15;
+      $old_id = $request['id'];
       unset($request['id']);
       unset($request['self']);
       unset($request['rid']);
       unset($request['og_roles_permissions']);
       $result = $handler->post('', $request);
-      $id = $result[0]['id'];
+      $new_id = $result[0]['id'];
 
     }
   }
@@ -523,12 +547,13 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
           // TODO write to mappings
 
           // User doesn't exist. Create.
+          $old_id = $request['id'];
           unset($request['id']);
           unset($request['uid']);
           unset($request['self']);
           unset($request['create_access']);
           $result = $handler->post('', $request);
-          $id = $result[0]['id'];
+          $new_id = $result[0]['id'];
 
 
         }
@@ -547,7 +572,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       $request = $value;
       unset($request['id']);
       $result = $handler->post('', $request);
-      $id = $result[0]['id'];
 
     }
   }
@@ -563,16 +587,47 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       // POST method, to create.
       $request = $value;
       // TODO unfinished
-      //$request['id'] = '999';
       //$request['vsite'] = '999'; // Need the mapped/new ID before calling this one.
       $result = $handler->post('', $request);
-      $id = $result[0]['id'];
 
     }
   }
 
 
+  // Keep track of export to import id mappings.
+  if ($new_id) {
+    $map_record = array(
+      'import_id' => $context['sandbox']['new_vsite_id'],
+      // Use the new Vsite ID.
+      'export_id' => $context['sandbox']['old_vsite_id'],
+      // Use the old Vsite ID.
+      'type' => $item_type,
+      // TODO col not used? Problem: reserved word.
+      //'column' => 'blah',
+      'export_item_id' => $old_id,
+      'import_item_id' => $new_id,
+    );
+    drupal_write_record('vsite_backup_import_mappings', $map_record);
+  }
+  if ($new_term_ids) {
 
+    foreach ($new_term_ids as $k => $new_term_id) {
+      $map_record = array(
+        'import_id' => $context['sandbox']['new_vsite_id'],
+        // Use the new Vsite ID.
+        'export_id' => $context['sandbox']['old_vsite_id'],
+        // Use the old Vsite ID.
+        'type' => 'taxonomy_term',
+        // TODO col not used? Problem: reserved word.
+        //'column' => 'blah',
+        'export_item_id' => $old_term_ids[$k],
+        'import_item_id' => $new_term_ids[$k],
+      );
+      drupal_write_record('vsite_backup_import_mappings', $map_record);
+    }
+  }
+
+  // TODO In the batch finalize operation, we could clear out the table, maybe.
 
 
 
