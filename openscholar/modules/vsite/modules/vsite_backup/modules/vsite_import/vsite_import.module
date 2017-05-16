@@ -192,6 +192,7 @@ function vsite_import_form_submit($form, &$form_state) {
     watchdog('vsite_import', "Error when extracting the tar.gz : $e");
   }
 
+  $all_files = _vsite_import_crawl_unpacked(drupal_realpath($destination_folder));
 
   $batch = array(
     'title' => t('Importing'),
