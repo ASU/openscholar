@@ -178,10 +178,8 @@ function vsite_import_form_submit($form, &$form_state) {
   $destination_folder = vsite_import_destination_folder($file);
 
   try {
-    dpm($file);
     if(file_exists(drupal_realpath($destination_folder))){
       $remnants = _vsite_import_crawl_unpacked(drupal_realpath($destination_folder));
-      dpm($remnants);
       _vsite_import_delete_files($remnants['files'], $remnants['dirs'], array(
         drupal_realpath($file->uri)
       ));
@@ -470,7 +468,8 @@ x      * Export ID: The ID of the export file being used
 
 // TODO For some reason we're missing hte first taxonomy term at this point in the process.
 
-//    dpm($item['taxonomy']);
+//    dpm($request);
+//    dpm($item);
     foreach ($item['taxonomy'] as $key => $value) {
 
       // POST method, to create.
