@@ -178,6 +178,15 @@ function vsite_import_form_submit($form, &$form_state) {
   $destination_folder = vsite_import_destination_folder($file);
 
   try {
+    dpm($file);
+    if(file_exists(drupal_realpath($destination_folder))){
+      $remnants = _vsite_import_crawl_unpacked(drupal_realpath($destination_folder));
+      dpm($remnants);
+      _vsite_import_delete_files($remnants['files'], $remnants['dirs'], array(
+        drupal_realpath($file->uri)
+      ));
+      $file = file_save($file);
+    }
     // Decompress and Untar the file
     $p = new PharData(drupal_realpath($file->uri));
     $p->decompress(); // creates /path/to/my.tar
@@ -215,19 +224,20 @@ INTERNAL
 
 /**
  * Delete the files and directories provided by _vsite_import_crawl_unpacked
- * @param $files
- * @param $dirs
+ * @param $files Array of file uri's
+ * @param $dirs Array of directiory uri's
+ * @param $ignore Array of items to ignore
  */
-function _vsite_import_delete_files($files, $dirs){
+function _vsite_import_delete_files($files, $dirs, $ignore = array()){
   foreach($files as $file)
   {
-    if (strpos($file,"vsite-imports")) {
+    if (strpos($file,"vsite-imports") && !in_array($file, $ignore)) {
       unlink($file);
     }
   }
   foreach($dirs as $file)
   {
-    if (strpos($file,"vsite-imports")) {
+    if (strpos($file,"vsite-imports") && !in_array($file, $ignore)) {
       rmdir($file);
     }
   }
@@ -257,6 +267,12 @@ function _vsite_import_crawl_unpacked($directory,  &$items = array()){
         array_push($items['files'], $file);
       }
     }
+  if(!isset($items['dirs'])){
+    $items['dirs'] = array();
+  }
+  if(!isset($items['files'])){
+    $items['files'] = array();
+  }
     return $items;
 }
 
@@ -454,6 +470,7 @@ x      * Export ID: The ID of the export file being used
 
 // TODO For some reason we're missing hte first taxonomy term at this point in the process.
 
+//    dpm($item['taxonomy']);
     foreach ($item['taxonomy'] as $key => $value) {
 
       // POST method, to create.
