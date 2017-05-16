@@ -434,12 +434,9 @@ x      * Export ID: The ID of the export file being used
 
   // TAXONOMY and TERMS
   if ($item_type == 'taxonomy') {
-
     $handler = restful_get_restful_handler('vocabulary', $major = 2, $minor = 0);
-
     // Pop the first item (vocab array) and create the taxonomy.
     $vocab_item = array_shift($item['taxonomy']);
-
     $request = $vocab_item;
 
     // Should have a unique machine_name. If not, make one.
@@ -452,6 +449,7 @@ x      * Export ID: The ID of the export file being used
 
       $request['machine_name'] = $request['machine_name'] . '_' . $i;
     }
+
     $old_id = $request['id'];
     unset($request['id']);
     unset($request['self']);
@@ -466,10 +464,6 @@ x      * Export ID: The ID of the export file being used
     // Now iterate on the remaining items and create the terms.
     $term_handler = restful_get_restful_handler('taxonomy', $major = 2, $minor = 0);
 
-// TODO For some reason we're missing hte first taxonomy term at this point in the process.
-
-//    dpm($request);
-//    dpm($item);
     foreach ($item['taxonomy'] as $key => $value) {
 
       // POST method, to create.
