@@ -140,7 +140,6 @@ function vsite_import_form($form, &$form_state) {
  */
 function vsite_import_form_validate($form, &$form_state)
 {
-
   $file = file_save_upload('file', array(
     'file_validate_extensions' => array('tar gz'), // Validate extensions.
   ));
@@ -149,7 +148,7 @@ function vsite_import_form_validate($form, &$form_state)
     $destination_folder = vsite_import_destination_folder($file);
     file_prepare_directory($destination_folder, FILE_CREATE_DIRECTORY);
     // Move the file, into the Drupal file system
-    if ($file = file_move($file, $destination_folder)) {
+    if ($file = file_move($file, $destination_folder, FILE_EXISTS_REPLACE)) {
       // Save the file for use in the submit handler.
       $form_state['storage']['file'] = $file;
     } else {
@@ -188,7 +187,6 @@ function vsite_import_form_submit($form, &$form_state) {
     foreach (glob(drupal_realpath($destination_folder) . "/*.json") as $json) {
       $json_files[] = $json;
     }
-    $all_files = _vsite_import_crawl_unpacked(drupal_realpath($destination_folder));
   } catch (Exception $e) {
     drupal_set_message("Unable to extract the tar.gz file", "error");
     watchdog('vsite_import', "Error when extracting the tar.gz : $e");
@@ -202,7 +200,7 @@ function vsite_import_form_submit($form, &$form_state) {
 
   if (!empty($json_files[0]) && $handle = fopen($json_files[0], 'r') ) {
     while ( $line = fgets($handle) ) {
-//      $batch['operations'][] = array('_vsite_import_import_line', array($json_files[0], $form_state['values']['clone']['Clone'], $line));
+      $batch['operations'][] = array('_vsite_import_import_line', array($json_files[0], $form_state['values']['clone']['Clone'], $line));
     }
     $batch['operations'][] = array('_vsite_import_track_unpacked_file', array($file, $all_files));
     fclose($handle);
@@ -213,6 +211,26 @@ function vsite_import_form_submit($form, &$form_state) {
 /*****************************************************************************
 INTERNAL
  ******************************************************************************/
+
+/**
+ * Delete the files and directories provided by _vsite_import_crawl_unpacked
+ * @param $files
+ * @param $dirs
+ */
+function _vsite_import_delete_files($files, $dirs){
+  foreach($files as $file)
+  {
+    if (strpos($file,"vsite-imports")) {
+      unlink($file);
+    }
+  }
+  foreach($dirs as $file)
+  {
+    if (strpos($file,"vsite-imports")) {
+      rmdir($file);
+    }
+  }
+}
 
 /**
  * Crawl unpacked files in a directory and return them in an array.
@@ -673,18 +691,7 @@ function vsite_import_finished_callback($success, $results, $operations){
   if ($success) {
     // Attempt to remove the files used for the import
     try {
-      foreach($results['all_files']['files'] as $file)
-      {
-        if (strpos($file,"vsite-imports")) {
-          unlink($file);
-        }
-      }
-      foreach($results['all_files']['dirs'] as $file)
-      {
-        if (strpos($file,"vsite-imports")) {
-          rmdir($file);
-        }
-      }
+      _vsite_import_delete_files($results['all_files']['files'], $results['all_files']['dirs']);
 
       // Delete Drupal's reference to the tar.gz file
       $file = file_load($results['file']->fid);
