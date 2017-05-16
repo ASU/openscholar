@@ -629,9 +629,9 @@ function vsite_backup_export_prep_taxonomy($data) {
   $tax_result = $tax_handler->get($tax_id, $tax_request);
 
   // First item in array is vocabulary, all following are terms.
-  $result += $tax_result;
+  $combined = array_merge($result, $tax_result);
 
-  return $result;
+  return $combined;
 }
 function vsite_backup_export_prep_file($data) {
 
