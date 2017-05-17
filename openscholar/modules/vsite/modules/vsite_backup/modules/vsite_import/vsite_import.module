@@ -138,8 +138,10 @@ function vsite_import_form($form, &$form_state) {
  * @param $form
  * @param $form_state
  */
-function vsite_import_form_validate($form, &$form_state)
-{
+function vsite_import_form_validate($form, &$form_state) {
+
+  // TODO validate if we're doing a clone, that the new name/purl is available.
+
   $file = file_save_upload('file', array(
     'file_validate_extensions' => array('tar gz'), // Validate extensions.
   ));
@@ -208,7 +210,7 @@ function vsite_import_form_submit($form, &$form_state) {
 
   if (!empty($json_files[0]) && $handle = fopen($json_files[0], 'r') ) {
     while ( $line = fgets($handle) ) {
-      $batch['operations'][] = array('_vsite_import_import_line', array($json_files[0], $form_state['values']['clone']['Clone'], $line));
+      $batch['operations'][] = array('_vsite_import_import_line', array($json_files[0], array('clone' => $form_state['values']['clone']['Clone'], 'name' => $form_state['values']['name']), $line));
     }
     $batch['operations'][] = array('_vsite_import_track_unpacked_file', array($file, $all_files));
     fclose($handle);
@@ -308,7 +310,8 @@ function _vsite_import_track_unpacked_file($file, $all_files, &$context){
  * Process a single line.
  *
  * @param $filepath String Path to file
- * @param $clone Boolean Determines whether the site is a clone or a restore. 1=clone 0=restore
+ * @param $clone Array First element determines whether the site is a clone or
+ *        a restore. Second specifies name/purl if clone.
  * @param $line String The line to be parsed
  * @param $context Batch API Context
  */
@@ -326,9 +329,23 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   $context['results']['rows_imported']++;
 
 
+  // For when we need to pass the import source directory path:
+//  $filepath = '/var/www/asu_scholar_workspace/faculty-websites/sites/default/files/private/vsite-imports/vsite-37-backup/37-backup.json';
+  $path_explode = explode("/", $filepath);
+  array_pop($path_explode); // Remove tarball name.
+  array_push($path_explode, "files/"); // Add files subdir. TODO Make this less hardcoded?
+  $import_file_dir = implode("/", $path_explode);
+
+//  dpm('clone status');
+//  dpm(var_export($clone, 1));
+  // $clone // "clone" if TRUE, 0 if FALSE
+
 // TODO add in clone/restore logic
   // do restore as actual restore or do delete/refresh?
-
+  // TODO make it a difference between a POST vs PUT in handler call? (plus sanitation? of id values)
+  // but... restore could be on site with deleted stuff.... so maybe just do
+  // 1. if restore, delete old, POST restore with new IDs, but try and keep pathauto values.
+  // 2. if clone, leave original alone, POST copy with new IDs, and sanitize pathauto values.
 
   // Trim off larger JSON array cruft. We treat each row as indpendent objects.
   // Double quotes are essential for proper interpretation of trim() param.
@@ -338,16 +355,26 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   $item_type = key($item);
 
 
-// TODO do another dispatch type thing as was done in exports or backup?
+  // TODO do another item type dispatcher as was done in exports or backup?
 
-
-  // TODO if values stored in $context['sandbox']['*_vsite_id'] vars persist, the below note can become obsolete.
+  // TODO if values stored in $context['results']['*_vsite_id'] vars persist, the below note can become obsolete.
   // Important Note: With imports, only one import should be done at a time.
   // this is a limitation of the modules, and due to the fact that multiple
   // imports could bear similar mappings values but be from different sites.
   // Because we use batch import, we don't log an import ID, and thus don't
   // track a means of differentiating mapping records.
 
+  // QUEUE PROCESSING ORDER:
+  // vsite
+  // global_taxonomy
+  // taxonomy
+  // files
+  // global_user_roles
+  // user_roles
+  // users
+  // nodes
+  // vsite_layout_blocks
+  // spaces_overrides
 
   // VSITE
   if ($item_type == 'vsite') {
@@ -358,6 +385,9 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
     foreach ($item as $key => $value) {
 
+      // TODO what to do with field_organization term reference field?
+      // TODO what to do with purl field? error out on collision? Restore/Clone difference.
+
       // POST method, to create.
       $request = $value[0];
       $old_id = $request['id'];
@@ -366,24 +396,21 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       $new_id = $result[0]['id'];
 
       // Persist these in the batch.
-      $context['sandbox']['old_vsite_id'] = $old_id;
-      $context['sandbox']['new_vsite_id'] = $new_id;
+      $context['results']['old_vsite_id'] = $old_id;
+      $context['results']['new_vsite_id'] = $new_id;
 
-      /*
-Auto   * Action ID: Auto-incrementing value that points to every change tracked by the mappings table
-x      * Import ID: ID of the complete import being performed
-x      * Export ID: The ID of the export file being used
-      * Type: The type of item being mapped. Should probably be verbose enough to point to a specific table ex. taxonomy, node
-?      * Column: Point to the column being updated inside of the table referenced by {type}
-      * Export Item ID: The ID pulled from the export file
-      * Import Item ID: The ID being mapped to
-      */
+      // TODO Complete clone vs reload logic here...
+
+      // If we're cloning, use the user submitted name/purl.
+      $purl = $clone['clone'] ? $clone['name'] : $request['purl'];
+      //drupal_write_record('purl', array('value' => $purl, 'provider' => 'spaces_og', 'id' => $new_id));
+      purl_save(array('value' => $purl, 'provider' => 'spaces_og', 'id' => $new_id));
+
     }
   }
 
 
-
-// TODO handling for pathauto, file references, taxonomy term references, user references
+// TODO handling for og, pathauto, file references, taxonomy term references, user references
 
 
   // NODE
@@ -393,6 +420,29 @@ x      * Export ID: The ID of the export file being used
     $handler = restful_get_restful_handler($node_type, $major = 2, $minor = 0);
 
     foreach ($item as $key => $value) {
+
+      // TODO
+      // ADD to all nodes via classes....
+      // og_group_ref ... [LANGUAGE_NONE][0]['target_id'] = $context['results']['new_vsite_id'] = $new_id;
+      // og_vocabulary ... not used?
+      // field_upload - on lots of nodes
+      //
+      // ADD to related node types
+      // field_presentation_file ? in presentation
+      // field_software_package ? in software release
+      // media_gallery_file ? media gallery
+      //   TODO handling of files...
+      // other reference fields? update with maps?
+
+
+      // TODO
+      // RESTORE:
+      //    pathauto processing - pre or post handler call?
+      //
+      // CLONE:
+      //    pathauto - unset pre handler call
+
+
 
       // POST method, to create.
       $request = $value[0];
@@ -482,7 +532,6 @@ x      * Export ID: The ID of the export file being used
 
   // FILE
   if ($item_type == 'file') {
-
     $handler = restful_get_restful_handler('files', $major = 2, $minor = 0);
 
     foreach ($item['file'] as $key => $value) {
@@ -490,8 +539,14 @@ x      * Export ID: The ID of the export file being used
       // POST method, to create.
       $request = $value;
       $old_id = $request['id'];
+      // Need this for copying files from import.
+      $request['import_file_dir'] = $import_file_dir;
+
       unset($request['id']);
       unset($request['self']);
+
+      // Needed for constructing path.
+      $request['vsite'] = $context['results']['new_vsite_id'];
 
       // TODO update path to reflect the file's location during import... then test again.
 
@@ -606,7 +661,6 @@ x      * Export ID: The ID of the export file being used
   }
 
 
-
   // SPACES OVERRIDES
   if ($item_type == 'spaces_overrides') {
 
@@ -626,9 +680,9 @@ x      * Export ID: The ID of the export file being used
   // Keep track of export to import id mappings.
   if ($new_id) {
     $map_record = array(
-      'import_id' => $context['sandbox']['new_vsite_id'],
+      'import_id' => $context['results']['new_vsite_id'],
       // Use the new Vsite ID.
-      'export_id' => $context['sandbox']['old_vsite_id'],
+      'export_id' => $context['results']['old_vsite_id'],
       // Use the old Vsite ID.
       'type' => $item_type,
       // TODO col not used? Problem: reserved word.
@@ -642,9 +696,9 @@ x      * Export ID: The ID of the export file being used
 
     foreach ($new_term_ids as $k => $new_term_id) {
       $map_record = array(
-        'import_id' => $context['sandbox']['new_vsite_id'],
+        'import_id' => $context['results']['new_vsite_id'],
         // Use the new Vsite ID.
-        'export_id' => $context['sandbox']['old_vsite_id'],
+        'export_id' => $context['results']['old_vsite_id'],
         // Use the old Vsite ID.
         'type' => 'taxonomy_term',
         // TODO col not used? Problem: reserved word.
@@ -659,6 +713,8 @@ x      * Export ID: The ID of the export file being used
   // TODO In the batch finalize operation, we could clear out the table, maybe.
 
 
+//  dpm('_vsite_import_import_line');
+//  dpm(get_defined_vars());
 
   /**
    * Simply show the import row count.
@@ -726,6 +782,11 @@ function vsite_import_finished_callback($success, $results, $operations){
     $message = t('An error occurred while processing %error_operation with arguments: @arguments', array('%error_operation' => $error_operation[0], '@arguments' => print_r($error_operation[1], TRUE)));
     drupal_set_message($message, 'error');
   }
+
+  // TODO Purge mappings, success or failure. Using export_id.
+  dpm('vsite_import_finalized_callback');
+  dpm(get_defined_vars());
+
 }
 /*****************************************************************************
 THEME
