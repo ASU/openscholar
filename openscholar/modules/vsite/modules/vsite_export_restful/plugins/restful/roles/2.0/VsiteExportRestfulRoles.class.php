@@ -64,7 +64,7 @@ class VsiteExportRestfulRoles extends \VsiteExportRestfulDataProvider {
   protected function queryForListFilter(\SelectQuery $query) {
     parent::queryForListFilter($query);
 
-    $request = $this->getRequest();
+    //$request = $this->getRequest();
 
 // TODO lookup from mappings table and set
 //    if (empty($request['vsite'])) {
@@ -72,13 +72,13 @@ class VsiteExportRestfulRoles extends \VsiteExportRestfulDataProvider {
 //    }
 
 
-    $wrapper = entity_metadata_wrapper('node', $request['vsite']);
+    $wrapper = entity_metadata_wrapper('node', $this->request['vsite']);
 //$wrapper = entity_metadata_wrapper('node', '4');
 
     if ($wrapper->og_roles_permissions->value()) {
       // The group override OG's default roles and permission. we need to return
       // only roles for this group.
-      $query->condition('gid', $request['vsite']);
+      $query->condition('gid', $this->request['vsite']);
     }
     else {
       // The group use the default roles and permission. We need to display only
@@ -142,8 +142,8 @@ $this->validate();
 //dpm($original_request);
     // If the original request is not empty, then illegal values are present.
     if (!empty($original_request)) {
-      $error_message = format_plural(count($original_request), 'Property @names is invalid.', 'Property @names are invalid.', array('@names' => implode(', ', array_keys($original_request))));
-      throw new \RestfulBadRequestException($error_message);
+//      $error_message = format_plural(count($original_request), 'Property @names is invalid.', 'Property @names are invalid.', array('@names' => implode(', ', array_keys($original_request))));
+//      throw new \RestfulBadRequestException($error_message);
     }
 
     // Once the record is built, write it and view it.

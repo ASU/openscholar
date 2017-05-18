@@ -412,6 +412,12 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
 // TODO handling for og, pathauto, file references, taxonomy term references, user references
 
+// TODO manual og membership adding needed for any resources, like was done in files resource:
+//  if ($this->request['vsite']) {
+//    og_group('node', $this->request['vsite'], array('entity_type' => 'file', 'entity' => $entity));
+//    $entity = file_load($entity->fid);
+//  }
+
 
   // NODE
   if ($item_type == 'node') {
@@ -548,8 +554,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       // Needed for constructing path.
       $request['vsite'] = $context['results']['new_vsite_id'];
 
-      // TODO update path to reflect the file's location during import... then test again.
-
       $result = $handler->post('', $request);
       $new_id = $result[0]['id'];
 
@@ -570,14 +574,18 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
       // POST method, to create.
       $request = $value;
-// TODO need to get $request['vsite'] mapping value squared away for these.
-// TODO see VsiteExportRestfulRoles.class.php TODO comments.
-//$request['vsite'] = 15;
+
       $old_id = $request['id'];
       unset($request['id']);
       unset($request['self']);
       unset($request['rid']);
       unset($request['og_roles_permissions']);
+
+// TODO need to get $request['vsite'] mapping value squared away for these.
+// TODO see VsiteExportRestfulRoles.class.php TODO comments.
+//$request['vsite'] = 15;
+      $request['vsite'] = $context['results']['new_vsite_id'];
+
       $result = $handler->post('', $request);
       $new_id = $result[0]['id'];
 
@@ -654,7 +662,11 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
       // POST method, to create.
       $request = $value;
+
       unset($request['id']);
+
+      $request['vsite'] = $context['results']['new_vsite_id'];
+
       $result = $handler->post('', $request);
 
     }
@@ -670,6 +682,7 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       // POST method, to create.
       $request = $value;
       // TODO unfinished
+//$request['vsite'] = $context['results']['new_vsite_id'];
       //$request['vsite'] = '999'; // Need the mapped/new ID before calling this one.
       $result = $handler->post('', $request);
 

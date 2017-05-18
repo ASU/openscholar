@@ -94,14 +94,20 @@ class VsiteExportRestfulSpacesOverrides extends \VsiteExportRestfulSpaces {
 
     ctools_include('layout', 'os');
 
+    $id = $this->request['vsite'];
+
     foreach ($this->request as $name => $overrides) {
+error_log(var_export($name, 1));
+error_log(var_export($overrides, 1));
 
-      if (is_array($overrides)) {
+//      if (is_array($overrides)) {
 
-        // TODO update $override['id'] value with new vsite id.
+        $overrides['type'] = 'og';
+        $overrides['id'] = $id;
+
         drupal_write_record('spaces_overrides', $overrides);
 
-      }
+//      }
     }
 
     return TRUE;

@@ -103,7 +103,13 @@ return TRUE;
 
       if (is_array($layout)) {
 
+
+$sid = $this->request['vsite'];
+
         foreach ($layout as $key => $block) {
+
+          $block['sid'] = $sid;
+          $block['context'] = $key;
 
           drupal_write_record('vsite_layout_block', $block);
 

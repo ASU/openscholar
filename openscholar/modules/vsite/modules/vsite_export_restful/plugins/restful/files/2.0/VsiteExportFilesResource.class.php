@@ -456,7 +456,6 @@ class VsiteExportFilesResource extends VsiteExportRestfulEntityCacheableBase {
 
     $this->initSpace();
     if ($this->checkEntityAccess('create', 'file', NULL) === FALSE && $this->checkGroupAccess('create') === FALSE) {
-watchdog('debug file', 'a');
       // User does not have access to create entity.
       $params = array('@resource' => $this->getPluginKey('label'));
       throw new RestfulForbiddenException(format_string('You do not have access to create a new @resource resource.', $params));
@@ -464,88 +463,34 @@ watchdog('debug file', 'a');
 
     $destination = 'public://';
     // Public files are put inside of a files directory within the vsite folder
-    // This keeps user uploaded files seperate from other vsite resources.
-    $vsite_directory = '/files';
+    // This keeps user uploaded files separate from other vsite resources.
+    $vsite_directory = '/files/';
 
-    // do spaces/private file stuff here
     if (isset($this->request['private'])) {
-watchdog('debug file', 'b');
       $destination = 'private://';
       $vsite_directory = '';
     }
 
-watchdog('debug obj', var_export('<pre>' . var_export(get_defined_vars(), 1) . '</pre>', 1));
     if (isset($this->request['vsite'])) {
-watchdog('debug file', 'c');
       $path = db_select('purl', 'p')->fields('p', array('value'))->condition('id', $this->request['vsite'])->execute()->fetchField();
-watchdog('debug file', $path);
       $destination .= $path . $vsite_directory;
     }
 
-watchdog('debug file', 'd');
-watchdog('debug file', $destination);
-
     $writable = file_prepare_directory($destination, FILE_MODIFY_PERMISSIONS | FILE_CREATE_DIRECTORY);
 
-watchdog('debug file dir', var_export($this->request['import_file_dir'] . check_plain($this->request['filename']), 1));
-   // TODO don't treat file as upload. treat as programmatic save and add
+    // Copy and save the file.
+    $handle = fopen($this->request['import_file_dir'] . $this->request['filename'], 'r');
+    $entity = file_save_data($handle, $destination . $this->request['filename'], FILE_EXISTS_RENAME);
+    fclose($handle);
 
-
-    // get file
-//    $file_source = 'private://vsite-imports/[[]]/files/'. check_plain($this->request['name']);
-    // then use $destination
-
-//    $handle = fopen($file_source', 'r');
-    // $destination has private:// so will be created as private file.
-    // Save it up a level, as we'll cleanup the working directory.
-//    $managed_file = file_save_data($handle, $destination . $gz_name . '.gz');
-
-    //$file = file_save_data($image, 'public://<filename>', FILE_EXISTS_RENAME);
-
-//    $purl = $this->request['purl'];
-//    unset($this->request['purl']);
-
-    if ($writable) {
-
-watchdog('debug file dir2', var_export($this['import_file_dir'] . check_plain($this->request['filename']), 1));
-
-      $handle = fopen($this['import_file_dir'] . check_plain($this->request['filename']), 'r');
-      if ($handle) { // Actually hve a file
-        $entity = file_save_data($handle, $destination . $this->request['filename'], FILE_EXISTS_RENAME);
-        watchdog('debug file', 'file');
-        watchdog('debug file', var_export($entity, 1));
-      }
-
-    }
-
-// TODO file saving working?
-watchdog('debug', 'ding');
-return;
-
-    // TODO error handling here...
-//    dpm(get_defined_vars());
-//    dpm(get_object_vars($this));
-//VSITE_IMPORT_DIRECTORY_NAME  --> vsite-imports
-//    /sites/default/files/private/vsite-imports
-
-//    return;
-    // 1. load in file name and path details
-    // 2. copy file to new vsite location
-    // 3. then save ala code above.
-
-
-    /*
-    if ($entity = file_save_upload('upload', $this->getValidators(), $destination, FILE_EXISTS_REPLACE)) {
-      watchdog('debug', 1);
+    if ($entity) {
 
       if (isset($this->request['vsite'])) {
-        watchdog('debug', 2);
         og_group('node', $this->request['vsite'], array('entity_type' => 'file', 'entity' => $entity));
         $entity = file_load($entity->fid);
       }
 
       if ($entity->status != FILE_STATUS_PERMANENT) {
-        watchdog('debug', 3);
         $entity->status = FILE_STATUS_PERMANENT;
         $entity = file_save($entity);
       }
@@ -554,51 +499,35 @@ return;
 
       return array($this->viewEntity($wrapper->getIdentifier()));
     }
-    elseif (isset($_FILES['files']) && $_FILES['files']['errors']['upload']) {
-      watchdog('debug', 4);
-      $entity->status = FILE_STATUS_PERMANENT;
-      throw new RestfulUnprocessableEntityException('Error uploading new file to server.');
-    }
-    elseif ($errors = form_get_errors()) {
-      watchdog('debug', 5);
-      throw new RestfulUnprocessableEntityException($errors['upload']);
-    }
     elseif (isset($this->request['embed']) && module_exists('media_internet')) {
-      watchdog('debug', 6);
 
       $provider = media_internet_get_provider($this->request['embed']);
       $provider->validate();
 
-      $validators = array();  // TODO: How do we populate this?
-      $file = $provider->getFileObject();
+      $validators = array();
       if ($validators) {
-        watchdog('debug', 7);
         $file = $provider->getFileObject();
 
         // Check for errors. @see media_add_upload_validate calls file_save_upload().
         // this code is ripped from file_save_upload because we just want the validation part.
         // Call the validation functions specified by this function's caller.
-        $errors = array_merge($errors, file_validate($file, $validators));
+        $errors = file_validate($file, $validators);
       }
 
       if (!empty($errors)) {
-        watchdog('debug', 8);
         throw new MediaInternetValidationException(implode("\n", $errors));
       }
       else {
-        watchdog('debug', 9);
         // Providers decide if they need to save locally or somewhere else.
         // This method returns a file object
         $entity = $provider->save();
 
         if ($entity->status != FILE_STATUS_PERMANENT) {
-          watchdog('debug', 10);
           $entity->status = FILE_STATUS_PERMANENT;
           $entity = file_save($entity);
         }
 
         if ($this->request['vsite']) {
-          watchdog('debug', 11);
           og_group('node', $this->request['vsite'], array('entity_type' => 'file', 'entity' => $entity));
           $entity = file_load($entity->fid);
         }
@@ -609,18 +538,14 @@ return;
       }
     }
     else {
-      watchdog('debug', 12);
       if (!$writable) {
-        watchdog('debug', 13);
         throw new RestfulServerConfigurationException('Unable to create directory for target file.');
       }
       else {
-        watchdog('debug', 14);
         // we failed for some other reason. What?
         throw new RestfulBadRequestException('Unable to process request.');
       }
     }
-    */
   }
 
   protected function getValidators() {
