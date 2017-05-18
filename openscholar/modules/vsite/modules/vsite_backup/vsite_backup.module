@@ -190,6 +190,51 @@ function vsite_backup_export_page(){
 ******************************************************************************/
 
 /**
+ *  Returns the new ID of the imported item
+ * @param $vsite_id Integer VSite ID
+ * @param $original_id Integer item ID from the original export file
+ * @return bool or generated ID of item in the new vsite
+ */
+function vsite_backup_get_new_mapping($vsite_id, $original_id){
+  $rows = array();
+  $result = db_query("SELECT * FROM {vsite_backup_import_mappings} e WHERE e.export_id = :vid AND e.export_item_id = :eid ", array(':vid' => $vsite_id, ':eid' => $original_id));
+
+  foreach ($result as $row){
+    array_push($rows, $row);
+  }
+
+  if(sizeof($rows) > 0){
+    return $rows[0]->import_item_id;
+  } else {
+    return false;
+  }
+}
+
+/**
+ * Returns the original ID of the imported item
+ * @param $vsite_id Integer VSite ID
+ * @param $new_id Integer ID of item in the new vsite
+ * @return bool or Integer item ID from the original export file
+ */
+function vsite_backup_get_old_mapping($vsite_id, $new_id){
+
+  $rows = array();
+  $result = db_query("SELECT * FROM {vsite_backup_import_mappings} e WHERE e.export_id = :vid AND e.import_item_id = :iid ", array(':vid' => $vsite_id, ':iid' => $new_id));
+
+  foreach ($result as $row){
+    array_push($rows, $row);
+  }
+
+  if(sizeof($rows) > 0){
+    return $rows[0]->export_item_id;
+  } else {
+    return false;
+  }
+
+  return $original_id;
+}
+
+/**
  * Query for an array of Vsite export data
  *
  * @param $gid
