@@ -12,3 +12,19 @@ function vsite_export_restful_ctools_plugin_directory($module, $plugin) {
   }
 }
 
+
+/*
+Resource class lineages, for quick reference
+
+files -> VsiteExportRestfulEntityCacheableBase -> RestfulEntityBase
+node -> [*] -> VsiteExportNodeRestfulBase -> RestfulEntityBaseNode -> RestfulEntityBase
+og_vocab -> RestfulEntityBase
+taxonomy -> VsiteExportRestfulEntityCacheableBase -> RestfulEntityBase
+user -> RestfulEntityBaseUser -> RestfulEntityBase
+vocabulary -> VsiteExportRestfulEntityCacheableBase -> RestfulEntityBase
+
+roles -> VsiteExportRestfulDataProvider -> RestfulDataProviderDbQuery
+spaces_overrides -> VsiteExportRestfulSpaces -> VsiteExportRestfulDataProvider -> RestfulDataProviderDbQuery
+vsite_lbv -> VsiteExportRestfulLayouts -> VsiteExportRestfulDataProvider -> RestfulDataProviderDbQuery
+
+*/
