@@ -42,7 +42,6 @@ function vsite_import_menu() {
     'description' => 'Allows administrators to manage Vsite Imports',
     'weight' => -30,
     'page callback' => 'drupal_get_form',
-//    'page arguments' => array('vsite_import_admin_settings_form'),
     'access arguments' => array('administer vsite import'),
   );
 
@@ -180,7 +179,7 @@ function vsite_import_form_submit($form, &$form_state) {
   $destination_folder = vsite_import_destination_folder($file);
 
   try {
-    if(file_exists(drupal_realpath($destination_folder))){
+    if (file_exists(drupal_realpath($destination_folder))) {
       $remnants = _vsite_import_crawl_unpacked(drupal_realpath($destination_folder));
       _vsite_import_delete_files($remnants['files'], $remnants['dirs'], array(
         drupal_realpath($file->uri)
@@ -229,14 +228,12 @@ INTERNAL
  * @param $ignore Array of items to ignore
  */
 function _vsite_import_delete_files($files, $dirs, $ignore = array()){
-  foreach($files as $file)
-  {
+  foreach($files as $file) {
     if (strpos($file,"vsite-imports") && !in_array($file, $ignore)) {
       unlink($file);
     }
   }
-  foreach($dirs as $file)
-  {
+  foreach($dirs as $file) {
     if (strpos($file,"vsite-imports") && !in_array($file, $ignore)) {
       rmdir($file);
     }
@@ -252,28 +249,28 @@ function _vsite_import_delete_files($files, $dirs, $ignore = array()){
  */
 function _vsite_import_crawl_unpacked($directory,  &$items = array()){
 
-    foreach(glob("{$directory}/*") as $file)
-    {
-      if(is_dir($file)) {
-        if(!isset($items['dirs'])){
+    foreach (glob("{$directory}/*") as $file) {
+      if (is_dir($file)) {
+        if (!isset($items['dirs'])) {
           $items['dirs'] = array();
         }
         array_push($items['dirs'], $file);
         _vsite_import_crawl_unpacked($file, $items);
       } else {
-        if(!isset($items['files'])){
+        if (!isset($items['files'])) {
           $items['files'] = array();
         }
         array_push($items['files'], $file);
       }
     }
-  if(!isset($items['dirs'])){
+  if (!isset($items['dirs'])) {
     $items['dirs'] = array();
   }
-  if(!isset($items['files'])){
+  if (!isset($items['files'])) {
     $items['files'] = array();
   }
-    return $items;
+
+  return $items;
 }
 
 
@@ -291,7 +288,6 @@ function vsite_import_destination_folder($file){
   $destination_folder = $destination . $foldername;
 
   return $destination_folder;
-
 }
 
 /**
@@ -330,15 +326,11 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
 
   // For when we need to pass the import source directory path:
-//  $filepath = '/var/www/asu_scholar_workspace/faculty-websites/sites/default/files/private/vsite-imports/vsite-37-backup/37-backup.json';
   $path_explode = explode("/", $filepath);
   array_pop($path_explode); // Remove tarball name.
   array_push($path_explode, "files/"); // Add files subdir. TODO Make this less hardcoded?
   $import_file_dir = implode("/", $path_explode);
 
-//  dpm('clone status');
-//  dpm(var_export($clone, 1));
-  // $clone // "clone" if TRUE, 0 if FALSE
 
 // TODO add in clone/restore logic
   // do restore as actual restore or do delete/refresh?
@@ -357,12 +349,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
   // TODO do another item type dispatcher as was done in exports or backup?
 
-  // TODO if values stored in $context['results']['*_vsite_id'] vars persist, the below note can become obsolete.
-  // Important Note: With imports, only one import should be done at a time.
-  // this is a limitation of the modules, and due to the fact that multiple
-  // imports could bear similar mappings values but be from different sites.
-  // Because we use batch import, we don't log an import ID, and thus don't
-  // track a means of differentiating mapping records.
 
   // QUEUE PROCESSING ORDER:
   // vsite
@@ -376,6 +362,13 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   // vsite_layout_blocks
   // spaces_overrides
 
+
+  // TODO - do we even need this?
+  // Set new vsite as og context for rest of operations, if available.
+  if (isset($context['results']['new_vsite_id'])) {
+    og_context('node', node_load($context['results']['new_vsite_id']));
+  }
+
   // VSITE
   if ($item_type == 'vsite') {
 
@@ -386,7 +379,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
     foreach ($item as $key => $value) {
 
       // TODO what to do with field_organization term reference field?
-      // TODO what to do with purl field? error out on collision? Restore/Clone difference.
 
       // POST method, to create.
       $request = $value[0];
@@ -399,11 +391,12 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       $context['results']['old_vsite_id'] = $old_id;
       $context['results']['new_vsite_id'] = $new_id;
 
+
       // TODO Complete clone vs reload logic here...
+
 
       // If we're cloning, use the user submitted name/purl.
       $purl = $clone['clone'] ? $clone['name'] : $request['purl'];
-      //drupal_write_record('purl', array('value' => $purl, 'provider' => 'spaces_og', 'id' => $new_id));
       purl_save(array('value' => $purl, 'provider' => 'spaces_og', 'id' => $new_id));
 
     }
@@ -411,12 +404,12 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
 
 // TODO handling for og, pathauto, file references, taxonomy term references, user references
+  // pauthauto seems to get set automatically alright... haven't checked manual override values.
+  // og is set automatically on some, can be set like in NODE below with og_group()
 
-// TODO manual og membership adding needed for any resources, like was done in files resource:
-//  if ($this->request['vsite']) {
-//    og_group('node', $this->request['vsite'], array('entity_type' => 'file', 'entity' => $entity));
-//    $entity = file_load($entity->fid);
-//  }
+  // file refs
+  // Taxonomy term refs
+  // user refs
 
 
   // NODE
@@ -463,6 +456,10 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       }
       $result = $handler->post('', $request);
       $new_id = $result[0]['id'];
+
+      // Set group context.
+      og_group('node', $this->request['vsite'], array('entity_type' => 'node', 'entity' => node_load($new_id)));
+
     }
   }
 
@@ -506,6 +503,8 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       $request['machine_name'] = $request['machine_name'] . '_' . $i;
     }
 
+    // TODO where are extra {spaces_overrides} entries with old vsite_id getting triggered?
+
     $old_id = $request['id'];
     unset($request['id']);
     unset($request['self']);
@@ -513,6 +512,9 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
     unset($request['tree']);
     unset($request['bundles']);
     // POST method, to create.
+
+    $request['vsite'] = $context['results']['new_vsite_id'];
+
     $result = $handler->post('', $request);
     $vid = $result[0]['id'];
     $new_id = $result[0]['id'];
@@ -564,6 +566,7 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   // GLOBAL USER ROLES
   // TODO We're not importing these... right? Just seems like a bad idea.
 
+
   // GROUP USER ROLES
   if ($item_type == 'group_user_roles') {
 
@@ -581,9 +584,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       unset($request['rid']);
       unset($request['og_roles_permissions']);
 
-// TODO need to get $request['vsite'] mapping value squared away for these.
-// TODO see VsiteExportRestfulRoles.class.php TODO comments.
-//$request['vsite'] = 15;
       $request['vsite'] = $context['results']['new_vsite_id'];
 
       $result = $handler->post('', $request);
@@ -602,7 +602,7 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       // POST method, to create after checking existence.
       $request = $value;
 
-// TODO write our own hook_vsite_import_user()
+// TODO (ASU) write our own hook_vsite_import_user() for CAS?
 
       // Allow for hook_vsite_import_user() to completely override user creation
       // process. If you use CAS or some other user provisioning service, this
@@ -681,9 +681,9 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
       // POST method, to create.
       $request = $value;
-      // TODO unfinished
-//$request['vsite'] = $context['results']['new_vsite_id'];
-      //$request['vsite'] = '999'; // Need the mapped/new ID before calling this one.
+
+      $request['vsite'] = $context['results']['new_vsite_id'];
+
       $result = $handler->post('', $request);
 
     }
@@ -723,11 +723,9 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
     }
   }
 
-  // TODO In the batch finalize operation, we could clear out the table, maybe.
 
+  // TODO In the batch finalize operation, we could clear out the mappings table, maybe.
 
-//  dpm('_vsite_import_import_line');
-//  dpm(get_defined_vars());
 
   /**
    * Simply show the import row count.
@@ -797,8 +795,6 @@ function vsite_import_finished_callback($success, $results, $operations){
   }
 
   // TODO Purge mappings, success or failure. Using export_id.
-  dpm('vsite_import_finalized_callback');
-  dpm(get_defined_vars());
 
 }
 /*****************************************************************************
@@ -813,183 +809,3 @@ API
 DEVELOPER NOTES
  ******************************************************************************/
 
-
-
-
-/**
- * Implement hook_menu()
- */
-/*
-function vsite_import_menu() {
-  $items['admin/content/csv_import'] = array(
-    'title' => 'Import CSV',
-    'description' => 'Import content from a <abbr title="Comma Separated Values">CSV</abbr> or <abbr title="Tab Separated Values">TSV</abbr> file.',
-    // 'access callback' => 'user_access',
-    'access arguments' => array('administer site configuration'),
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('vsite_import_form'),
-//  'file' => 'vsite_import.admin.inc',
-  );
-  return $items ;
-}
-*/
-
-/**
- * Build a form to upload CSV to.
- */
-/*
-function vsite_import_form() {
-  $form['#attributes'] = array(
-    'enctype' => 'multipart/form-data'
-  );
-  $form['csvfile'] = array(
-    '#title' => t('CSV File'),
-    '#type'  => 'file',
-    '#description' => ($max_size = parse_size(ini_get('upload_max_filesize'))) ? t('Due to server restrictions, the <strong>maximum upload file size is !max_size</strong>. Files that exceed this size will be disregarded.', array('!max_size' => format_size($max_size))) : '',
-  ) ;
-  $form['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t('Commence Import'),
-  ) ;
-  $form['#validate'] = array(
-    'vsite_import_validate_fileupload',
-    'vsite_import_form_validate',
-  ) ;
-  return $form ;
-}
-*/
-
-/**
- * Validate the file upload. It must be a CSV, and we must
- * successfully save it to our import directory.
- */
-/*function vsite_import_validate_fileupload(&$form, &$form_state) {
-  $validators = array(
-    'file_validate_extensions' => array( 'csv CSV' ),
-  ) ;
-  if ( $file = file_save_upload('csvfile', $validators, 'temporary://') ) {
-    // The file was saved using file_save_upload() and was added to
-    // the files table as a temporary file. We'll make a copy and let
-    // the garbage collector delete the original upload.
-    $csv_dir = 'temporary://csvfile';
-    $directory_exists = file_prepare_directory($csv_dir, FILE_CREATE_DIRECTORY);
-    if ($directory_exists) {
-      $destination = $csv_dir .'/' . $file->filename;
-      if (file_copy($file, $destination, FILE_EXISTS_REPLACE)) {
-        $form_state['values']['csvupload'] = $destination;
-      }
-      else {
-        form_set_error('vsite_import', t('Unable to copy upload file to !dest', array('!dest' => $destination)));
-      }
-    }
-  }
-}*/
-
-/**
- * Validate the upload. Ensure that the CSV looks something like we
- * expect it to.
- */
-/*
-function vsite_import_form_validate(&$form, &$form_state) {
-  if ( isset( $form_state['values']['csvupload'] ) ) {
-    if ( $handle = fopen($form_state['values']['csvupload'], 'r') ) {
-      $line_count = 1 ;
-      $first = TRUE ;
-      if ( $line = fgetcsv($handle, 4096) ) {
-
-        // Validate the uploaded CSV here.
-        
-        // The example CSV happens to have cell A1 ($line[0]) as
-        // below; we validate it only.
-         
-        // You'll probably want to check several headers, eg:
-        //   if ( $line[0] == 'Index' || $line[1] != 'Supplier' || $line[2] != 'Title' )
-        // if ( $line[0] != 'Example CSV for vsite_import.module - http://github.com/xurizaemon/vsite_import' ) {
-        //   form_set_error('csvfile', t('Sorry, this file does not match the expected format.')) ;
-        // }
-      }
-      fclose($handle);
-    }
-    else {
-      form_set_error('csvfile', t('Unable to read uploaded file !filepath', array('!filepath' => $form_state['values']['csvupload'])));
-    }
-  }
-}
-*/
-
-/**
- * Handle form submission. Read the CSV into a set of batch operations
- * and fire them off.
- */
-/*
-function vsite_import_form_submit(&$form, &$form_state) {
-  $batch = array(
-    'title' => t('Importing CSV ...'),
-    'operations' => array(),
-    'init_message' => t('Commencing'),
-    'progress_message' => t('Processed @current out of @total.'),
-    'error_message' => t('An error occurred during processing'),
-    'finished' => 'vsite_import_import_finished',
-  ) ;
-  if ( isset( $form_state['values']['csvupload'] ) ) {
-    if ( $handle = fopen($form_state['values']['csvupload'], 'r') ) {
-      $batch['operations'][] = array('_vsite_import_remember_filename', array( $form_state['values']['csvupload'] ) ) ;
-      $line_count = 1 ;
-      $first = TRUE ;
-      $line = fgetcsv($handle, 4096);
-      while ( $line = fgetcsv($handle, 4096) ) {
-
-         // we use base64_encode to ensure we don't overload the batch
-         // processor by stuffing complex objects into it
-
-        $batch['operations'][] = array('_vsite_import_import_line', array(array_map('base64_encode', $line)));
-      }
-      fclose($handle);
-    } // we caught this in vsite_import_form_validate()
-  } // we caught this in vsite_import_form_validate()
-  batch_set($batch);
-}
-*/
-
-/**
- * Handle batch completion.
- */
-/*function vsite_import_import_finished($success, $results, $operations) {
-  if ( !empty($results['failed_rows']) ) {
-    $dir = 'public://vsite_import' ;
-    $targs = array();
-    if (file_prepare_directory( $dir, FILE_CREATE_DIRECTORY ) ) {
-      $csv_filename = 'failed_rows-'. basename($results['uploaded_filename']); // we validated extension on upload
-      $csv_filepath = $dir .'/'. $csv_filename;
-      $targs = array(
-        '!csv_url' => l(check_plain($csv_filename), file_create_url($csv_filepath)),
-        '%csv_filename' => $csv_filename,
-        '%csv_filepath' => $csv_filepath,
-      ) ;
-      if ( $handle = fopen($csv_filepath, 'w+') ) {
-        foreach( $results['failed_rows'] as $failed_row ) {
-          fputcsv($handle, $failed_row);
-        }
-        fclose($handle);
-        drupal_set_message(t('Some rows failed to import. You may download a CSV of these rows: !csv_url', $targs), 'error');
-      }
-      else {
-        drupal_set_message(t('Some rows failed to import, but unable to write error CSV to %csv_filepath', $targs), 'error');
-      }
-    }
-    else {
-      drupal_set_message(t('Some rows failed to import, but unable to create directory for error CSV at %csv_directory', $targs), 'error');
-    }
-  }
-  return t('The CSV import has completed.');
-}*/
-
-/**
- * Remember the uploaded CSV filename
- *
- * @TODO is there a better way to pass a value from inception of the
- * batch to the finished function?
- */
-/*function _vsite_import_remember_filename($filename, &$context) {
-  $context['results']['uploaded_filename'] = $filename ;
-}*/
