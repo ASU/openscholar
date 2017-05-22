@@ -38,7 +38,7 @@ function vsite_import_permission() {
 function vsite_import_menu() {
   $items = array();
   $items['admin/config/vsite-import'] = array(
-    'title' => 'Vsite Import',
+    'title' => 'Vsite Restore',
     'description' => 'Allows administrators to manage Vsite Imports',
     'weight' => -30,
     'page callback' => 'drupal_get_form',
@@ -47,7 +47,7 @@ function vsite_import_menu() {
   );
 
   $items['admin/config/vsite-import/manage'] = array(
-    'title' => 'Vsite Import',
+    'title' => 'Vsite Restore',
     'description' => 'Allows administrators to manage Vsite Imports',
     'page callback' => 'vsite_import_page',
     'access arguments' => array('administer vsite import'),
@@ -93,7 +93,7 @@ function vsite_import_form($form, &$form_state) {
 
   $form['file'] = array(
     '#type' => 'file',
-    '#title' => t('Vsite Import File'),
+    '#title' => t('Vsite Restore File'),
     '#description' => t('Upload the Vsite Export file'),
   );
 
