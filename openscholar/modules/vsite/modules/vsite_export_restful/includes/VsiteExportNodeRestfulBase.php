@@ -101,7 +101,9 @@ class VsiteExportNodeRestfulBase extends RestfulEntityBaseNode {
     }
     // For POST, PATCH, PUT, DELETE, or anything else, you need stronger perms.
     else {
-      return vsite_og_user_access('administer vsite import');
+      // Importing, don't have context, and this is a sensitive admin-only
+      // action, so use plain user_access() check.
+      return user_access('administer vsite import');
     }
 
   }
