@@ -339,7 +339,7 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   // 1. if restore, delete old, POST restore with new IDs, but try and keep pathauto values.
   // 2. if clone, leave original alone, POST copy with new IDs, and sanitize pathauto values.
 
-  // Trim off larger JSON array cruft. We treat each row as indpendent objects.
+  // Trim off larger JSON array cruft. We treat each row as independent objects.
   // Double quotes are essential for proper interpretation of trim() param.
   $line = trim($line, "[], \t\n\r\0\x0B");
 
@@ -363,10 +363,10 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   // spaces_overrides
 
 
-  // TODO - do we even need this?
-  // Set new vsite as og context for rest of operations, if available.
+  // Set new vsite as og context and space for rest of operations, if available.
   if (isset($context['results']['new_vsite_id'])) {
     og_context('node', node_load($context['results']['new_vsite_id']));
+    vsite_get_vsite($context['results']['new_vsite_id']);
   }
 
   // VSITE
@@ -391,8 +391,10 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       $context['results']['old_vsite_id'] = $old_id;
       $context['results']['new_vsite_id'] = $new_id;
 
-
-      // TODO Complete clone vs reload logic here...
+      // TODO Complete clone vs restore logic here...
+error_log(var_export($clone, 1));
+$clone['clone'];
+$clone['name'];
 
 
       // If we're cloning, use the user submitted name/purl.
@@ -457,8 +459,8 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       $result = $handler->post('', $request);
       $new_id = $result[0]['id'];
 
-      // Set group context.
-      og_group('node', $this->request['vsite'], array('entity_type' => 'node', 'entity' => node_load($new_id)));
+      // Set group context with the new_vsite_id.
+      og_group('node', $context['results']['new_vsite_id'], array('entity_type' => 'node', 'entity' => node_load($new_id)));
 
     }
   }
@@ -739,7 +741,7 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
    *
    * You can comment out the line above if you uncomment this one.
    */
-  $context['message'] = t('Importing %title', array('%title' => $line[2]));
+  $context['message'] = t('Importing %title', array('%title' => $item_type));
 
   /**
    * In order to slow importing and debug better, we can uncomment

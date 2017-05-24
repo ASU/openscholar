@@ -14,10 +14,15 @@ class VsiteExportRestfulLayoutsOverrides extends \VsiteExportRestfulLayouts {
    * Verify the user have access to the manage layout.
    */
   public function checkGroupAccess() {
-// TODO Work out better access check override/logic
-return TRUE;
     if (parent::checkGroupAccess()) {
       return TRUE;
+    }
+
+    // Allow for exports.
+    $method = $this->getMethod();
+    // For GET method, allow access based on backup perm.
+    if ($method == \RestfulBase::GET) {
+      return vsite_og_user_access('access vsite backup');
     }
 
     $account = $this->getAccount();

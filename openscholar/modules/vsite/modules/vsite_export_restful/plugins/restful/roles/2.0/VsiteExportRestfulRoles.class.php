@@ -66,14 +66,12 @@ class VsiteExportRestfulRoles extends \VsiteExportRestfulDataProvider {
 
     //$request = $this->getRequest();
 
-// TODO lookup from mappings table and set
-//    if (empty($request['vsite'])) {
-//      throw new \RestfulForbiddenException('You must specify a vsite ID.');
-//    }
+    if (empty($this->request['vsite'])) {
+      throw new \RestfulForbiddenException('You must specify a vsite ID.');
+    }
 
 
     $wrapper = entity_metadata_wrapper('node', $this->request['vsite']);
-//$wrapper = entity_metadata_wrapper('node', '4');
 
     if ($wrapper->og_roles_permissions->value()) {
       // The group override OG's default roles and permission. we need to return
@@ -91,18 +89,10 @@ class VsiteExportRestfulRoles extends \VsiteExportRestfulDataProvider {
   /**
    * Overrides RestfulDataProviderDbQuery::create().
    *
-   * Verify the uer have permission to invoke this method.
-   */
-//  public function create() {
-//    $this->validate();
-//    return parent::create();
-//  }
-
-  /**
-   * {@inheritdoc}
+   * Verify the user has permission to invoke this method.
    */
   public function create() {
-$this->validate();
+    $this->validate();
     $request = $this->getRequest();
     static::cleanRequest($request);
     $save = FALSE;
@@ -139,11 +129,10 @@ $this->validate();
       throw new \RestfulBadRequestException('No values were sent with the request.');
     }
 
-//dpm($original_request);
     // If the original request is not empty, then illegal values are present.
     if (!empty($original_request)) {
-//      $error_message = format_plural(count($original_request), 'Property @names is invalid.', 'Property @names are invalid.', array('@names' => implode(', ', array_keys($original_request))));
-//      throw new \RestfulBadRequestException($error_message);
+      //$error_message = format_plural(count($original_request), 'Property @names is invalid.', 'Property @names are invalid.', array('@names' => implode(', ', array_keys($original_request))));
+      //throw new \RestfulBadRequestException($error_message);
     }
 
     // Once the record is built, write it and view it.

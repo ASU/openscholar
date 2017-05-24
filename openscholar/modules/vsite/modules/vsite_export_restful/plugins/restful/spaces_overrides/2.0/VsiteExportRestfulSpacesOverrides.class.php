@@ -18,6 +18,13 @@ class VsiteExportRestfulSpacesOverrides extends \VsiteExportRestfulSpaces {
       return TRUE;
     }
 
+    // Allow for exports.
+    $method = $this->getMethod();
+    // For GET method, allow access based on backup perm.
+    if ($method == \RestfulBase::GET) {
+      return vsite_og_user_access('access vsite backup');
+    }
+
     $account = $this->getAccount();
 
     if (!spaces_access_admin($account, $this->space)) {

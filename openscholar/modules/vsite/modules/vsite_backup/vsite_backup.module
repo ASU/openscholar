@@ -74,9 +74,10 @@ function vsite_backup_menu()
 {
   $items['vsite-backup'] = array(
     'title' => t('Vsite Backup'),
-    'description' => 'Vsite vackup.',
+    'description' => 'Vsite backup.',
     'page callback' => 'vsite_backup_export_page',
-    'access arguments' => array('administer vsite backup'),
+    'access callback' => 'vsite_og_user_access',
+    'access arguments' => array('access vsite backup'),
     'weight' => 50,
     'menu_name' => 'vb',
   );
@@ -91,9 +92,9 @@ function vsite_backup_menu()
  */
 function vsite_backup_permission() {
   return array(
-    'administer vsite backup' => array(
-      'title' => t('Administer Vsite Backup'),
-      'description' => t('Access Vsite Backup admin pages.'),
+    'access vsite backup' => array(
+      'title' => t('Access Vsite Backup'),
+      'description' => t('Access Vsite Backup pages.'),
     ),
   );
 }
@@ -131,7 +132,7 @@ function vsite_backup_cron_queue_info() {
 ******************************************************************************/
 
 function vsite_backup_page_access() {
-  if (user_access('administer vsite backup')) {
+  if (user_access('access vsite backup')) {
     return TRUE;
   } else {
     return FALSE;
@@ -141,16 +142,6 @@ function vsite_backup_page_access() {
 /*****************************************************************************
  FORMS
 ******************************************************************************/
-
-// TODO Vsite backup form
-
-// TODO Vsite backup form validation function
-// query {vsite_backup_exports} for count of # of exports for this vsite.
-// if limit exceeded, display
-// OR display on form that limit is exceeded, and that proceeding will result
-// in the oldest export being deleted.
-
-// TODO Vsite backup form submit calls vsite_backup_create_vsite_export_queue($vsite_id)
 
 function vsite_backup_form($form, &$form_state) {
   $vsite = og_context();

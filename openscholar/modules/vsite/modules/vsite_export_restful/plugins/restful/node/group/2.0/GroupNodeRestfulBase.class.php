@@ -27,7 +27,6 @@ class GroupNodeRestfulBase extends VsiteExportNodeRestfulBase {
     );
 
 
-
     $public_fields['title'] = array(
       'property' => 'title',
     );
@@ -78,7 +77,11 @@ class GroupNodeRestfulBase extends VsiteExportNodeRestfulBase {
   public function queryForListFilter(\EntityFieldQuery $query) {
     parent::queryForListFilter($query);
 
-    $query->propertyCondition('type', array('personal', 'project', 'department'), 'IN');
+    $query->propertyCondition('type', array(
+      'personal',
+      'project',
+      'department'
+    ), 'IN');
   }
 
   /**
@@ -140,7 +143,6 @@ class GroupNodeRestfulBase extends VsiteExportNodeRestfulBase {
   }
 
 
-
   /**
    * {@inheritdoc}
    *
@@ -170,7 +172,7 @@ class GroupNodeRestfulBase extends VsiteExportNodeRestfulBase {
 
 
 //    if ($this->checkEntityAccess('create', $this->entityType, $entity) === FALSE) {
-      // User does not have access to create entity.
+    // User does not have access to create entity.
 //      $params = array('@resource' => $this->getPluginKey('label'));
 //      throw new RestfulForbiddenException(format_string('You do not have access to create a new @resource resource.', $params));
 //    }
@@ -207,7 +209,7 @@ class GroupNodeRestfulBase extends VsiteExportNodeRestfulBase {
     $this->overrideRange();
 
     $version = $this->getVersion();
-    $this->setHttpHeaders('X-API-Version', 'v' . $version['major']  . '.' . $version['minor']);
+    $this->setHttpHeaders('X-API-Version', 'v' . $version['major'] . '.' . $version['minor']);
 
     if (!$method_name = $this->getControllerFromPath()) {
       throw new RestfulBadRequestException('Path does not exist');
@@ -303,5 +305,80 @@ class GroupNodeRestfulBase extends VsiteExportNodeRestfulBase {
 //    throw $e;
   }
 
+  /**
+   * Determine if an entity is valid, and accessible.
+   *
+   * @param $op
+   *   The operation to perform on the entity (view, update, delete).
+   * @param $entity_id
+   *   The entity ID.
+   *
+   * @return bool
+   *   TRUE if entity is valid, and user can access it.
+   *
+   * @throws RestfulUnprocessableEntityException
+   * @throws RestfulForbiddenException
+   */
+  protected function isValidEntity($op, $entity_id) {
+    $entity_type = $this->entityType;
+
+    $params = array(
+      '@id' => $entity_id,
+      '@resource' => $this->getPluginKey('label'),
+    );
+
+    if (!$entity = entity_load_single($entity_type, $entity_id)) {
+      throw new RestfulUnprocessableEntityException(format_string('The entity ID @id for @resource does not exist.', $params));
+    }
+
+    list(,, $bundle) = entity_extract_ids($entity_type, $entity);
+
+    $resource_bundle = $this->getBundle();
+    if ($resource_bundle && $bundle != $resource_bundle) {
+      throw new RestfulUnprocessableEntityException(format_string('The entity ID @id is not a valid @resource.', $params));
+    }
+
+    if ($this->checkEntityAccess($op, $entity_type, $entity) === FALSE) {
+
+      if ($op == 'view' && !$this->getPath()) {
+        // Just return FALSE, without an exception, for example when a list of
+        // entities is requested, and we don't want to fail all the list because
+        // of a single item without access.
+        return FALSE;
+      }
+
+      // Entity was explicitly requested so we need to throw an exception.
+      throw new RestfulForbiddenException(format_string('You do not have access to entity ID @id of resource @resource', $params));
+    }
+
+    return TRUE;
+  }
+
+  /**
+   * Override checkEntityAccess()
+   */
+  public function checkEntityAccess($op, $entity_type, $entity) {
+
+    global $user;
+    $acct_id = $user->uid;
+
+    $method = $this->getMethod();
+
+    // For GET method, allow access based on backup perm.
+    if ($method == \RestfulBase::GET) {
+
+      // If called as user 1 (programmatically, maybe during cron), free pass.
+      if ($acct_id === '1') {
+        return TRUE;
+      }
+
+      return vsite_og_user_access('access vsite backup');
+    }
+    // For POST, PATCH, PUT, DELETE, or anything else, you need stronger perms.
+    else {
+      return vsite_og_user_access('administer vsite import');
+    }
+
+  }
 
 }

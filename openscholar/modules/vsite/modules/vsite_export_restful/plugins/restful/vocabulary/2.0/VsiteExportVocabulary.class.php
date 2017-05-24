@@ -49,8 +49,33 @@ class VsiteExportVocabulary extends VsiteExportRestfulEntityCacheableBase {
    * {@inheritdoc}
    */
   protected function checkEntityAccess($op, $entity_type, $entity) {
+
+    global $user;
+    $acct_id = $user->uid;
+
+    $method = $this->getMethod();
+
+    // For GET method, allow access based on backup perm.
+    if ($method == \RestfulBase::GET) {
+
+      // If called as user 1 (programmatically, maybe during cron), free pass.
+      if ($acct_id === '1') {
+        return TRUE;
+      }
+
+      return vsite_og_user_access('access vsite backup');
+    }
+    // For POST, PATCH, PUT, DELETE, or anything else, you need stronger perms.
+    else {
+      return vsite_og_user_access('administer vsite import');
+    }
+
+  }
+  /*
+  protected function checkEntityAccess($op, $entity_type, $entity) {
     return TRUE;
   }
+  */
 
   /**
    * {@inheritdoc}
