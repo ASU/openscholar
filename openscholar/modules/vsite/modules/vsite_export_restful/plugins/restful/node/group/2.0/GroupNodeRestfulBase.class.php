@@ -150,41 +150,9 @@ class GroupNodeRestfulBase extends VsiteExportNodeRestfulBase {
    */
   public function createEntity() {
 
-
-    // TODO does this extension even help? Or do we need to go to RestfulBase.process ?
-
-    $entity_info = $this->getEntityInfo();
-    $bundle_key = $entity_info['entity keys']['bundle'];
-    $values = $bundle_key ? array($bundle_key => $this->bundle) : array();
-//$request = $this->getRequest();
-//$values = array($request['type'] => $request);
-
-    // TODO Will need special handling for these individually
-    unset($this->request['users']);
-    unset($this->request['self']);
-    unset($this->request['group_group']);
-    unset($this->request['field_group_path']);
-    //unset($this->request['purl']);
-
     $entity = entity_create($this->entityType, $this->request);
-    //$entity = entity_create($this->entityType, $values); // 'node'
-    //$entity = entity_create($request['type'], $values); // 'personal' etc.
-
-
-//    if ($this->checkEntityAccess('create', $this->entityType, $entity) === FALSE) {
-    // User does not have access to create entity.
-//      $params = array('@resource' => $this->getPluginKey('label'));
-//      throw new RestfulForbiddenException(format_string('You do not have access to create a new @resource resource.', $params));
-//    }
 
     $wrapper = entity_metadata_wrapper($this->entityType, $entity);
-    //$wrapper = entity_metadata_wrapper($request['type'], $entity);
-
-
-//$values = array();
-//foreach ($wrapper->getPropertyInfo() as $key => $val) {
-//  $values[$key] = $wrapper->$key->value();
-//}
 
     $this->setPropertyValues($wrapper);
 

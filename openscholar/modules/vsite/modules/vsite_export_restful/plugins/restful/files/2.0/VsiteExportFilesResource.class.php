@@ -390,9 +390,6 @@ class VsiteExportFilesResource extends VsiteExportRestfulEntityCacheableBase {
     }
 
   }
-//  public function checkEntityAccess($op, $entity_type, $entity) {
-//    return parent::checkEntityAccess($op, $entity_type, $entity) || $this->checkGroupAccess($op, $entity);
-//  }
 
   /**
    * Override checkPropertyAccess()
@@ -916,24 +913,3 @@ class VsiteExportFilesResource extends VsiteExportRestfulEntityCacheableBase {
   }
 }
 
-/**
- * Replaces the core file_validate_extensions function when the file in question
- * has a temporary extension.
- */
-/*
-function file_validate_extension_from_mimetype(stdClass $file, $extensions) {
-  include_once DRUPAL_ROOT . '/includes/file.mimetypes.inc';
-  $maps = file_mimetype_mapping();
-  $ext_arr = explode(' ', $extensions);
-  $index = array_search($file->filemime, $maps['mimetypes']);
-  $exts = array_keys($maps['extensions'], $index);
-  $passes = array_intersect($ext_arr, $exts);
-
-  $errors = array();
-  if (!count($passes)) {
-    $errors[] = t('Only files with the following extensions are allowed: %files-allowed.', array('%files-allowed' => $extensions));
-  }
-
-  return $errors;
-}
-*/

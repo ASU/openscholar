@@ -51,15 +51,6 @@ class VsiteExportTaxonomyTerm extends VsiteExportRestfulEntityCacheableBase {
 
     $entity = entity_create($this->entityType, $values);
 
-
-    /* Functionality for admins. Don't need per-Vsite entity access checks.
-    if ($this->checkEntityAccess('create', $this->entityType, $entity) === FALSE) {
-      // User does not have access to create entity.
-      $params = array('@resource' => $this->getPluginKey('label'));
-      throw new RestfulForbiddenException(format_string('You do not have access to create a new @resource resource.', $params));
-    }
-    */
-
     $wrapper = entity_metadata_wrapper($this->entityType, $entity);
 
     $this->setPropertyValues($wrapper);
@@ -171,9 +162,6 @@ class VsiteExportTaxonomyTerm extends VsiteExportRestfulEntityCacheableBase {
    * Display taxonomy terms from the current vsite.
    */
   protected function queryForListFilter(\EntityFieldQuery $query) {
-//    if (empty($request['vsite'])) {
-//      throw new \RestfulBadRequestException(t('You need to provide a vsite.'));
-//    }
 
     if (!$vsite = vsite_get_vsite($this->request['vsite'])) {
       return;
@@ -267,27 +255,6 @@ class VsiteExportTaxonomyTerm extends VsiteExportRestfulEntityCacheableBase {
     }
 
   }
-  /*
-  protected function checkEntityAccess($op, $entity_type, $entity) {
-
-    if (!$relation = $this->getRelation($entity)) {
-      return FALSE;
-    }
-
-    if ($op == 'view') {
-      return TRUE;
-    }
-
-    // We need this in order to alter the global user object.
-    $this->getAccount();
-
-    spaces_set_space(vsite_get_vsite($relation->gid));
-
-    if (!vsite_og_user_access('administer taxonomy')) {
-      throw new \RestfulBadRequestException("You are not allowed to create terms.");
-    }
-  }
-  */
 
   /**
    * Get the vocabulary relation from request.

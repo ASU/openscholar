@@ -92,9 +92,6 @@ class VsiteExportRestfulSpacesOverrides extends \VsiteExportRestfulSpaces {
    * }
    */
   public function createSpace() {
-    // Check group access.
-// TODO  use this resolution to access check for all import resources? or use their method... or?
-//    $this->checkGroupAccess();
 
     // Validate the object from the request.
     $this->validate();

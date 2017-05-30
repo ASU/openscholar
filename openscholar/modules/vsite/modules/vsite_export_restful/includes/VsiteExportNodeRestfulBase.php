@@ -54,12 +54,6 @@ class VsiteExportNodeRestfulBase extends RestfulEntityBaseNode {
     }
 
 
-    //$public_fields['redirect'] = array(
-    //  'property' => 'redirect',
-    //);
-    //$public_fields['metatags'] = array(
-    //  'property' => 'metatags',
-    //);
     if (field_info_instance($this->getEntityType(), 'path', $this->getBundle())) {
       $public_fields['path'] = array(
         'property' => 'path',
@@ -107,58 +101,6 @@ class VsiteExportNodeRestfulBase extends RestfulEntityBaseNode {
     }
 
   }
-  /* TODO use default handling. functionality is for admins only anyway.
-  protected function checkEntityAccess($op, $entity_type, $entity) {
-    $request = $this->getRequest();
-
-    if (empty($entity->nid)) {
-      // This is still a new node. Skip.
-      return;
-    }
-
-    if (isset($request['vsite'])) {
-      spaces_set_space(spaces_load('og', $request['vsite']));
-    }
-
-
-    if ($is_group = og_is_group($entity_type, $entity)) {
-      $group = $entity;
-    }
-    else {
-      $wrapper = entity_metadata_wrapper('node', $entity);
-      $group = $wrapper->{OG_AUDIENCE_FIELD}->get(0)->value();
-    }
-
-    if (empty($request['vsite'])) {
-      spaces_set_space(spaces_load('og', $group->nid));
-    }
-
-    $manager = og_user_access('node', $group->nid, 'administer users', $this->getAccount());
-
-    if ($is_group) {
-      // In addition to the node access check, we need to see if the user can
-      // manage groups.
-      return $manager && !vsite_access_node_access($group, 'view', $this->getAccount()) == NODE_ACCESS_DENY;
-    }
-    else {
-      $app = os_get_app_by_bundle($entity->type);
-      $space = spaces_get_space();
-      $application_settings = $space->controllers->variable->get('spaces_features');
-
-      switch ($application_settings[$app]) {
-        case OS_DISABLED_APP:
-          return FALSE;
-
-        case OS_PRIVATE_APP:
-          return og_is_member('node', $group->nid, 'user', $this->getAccount()) && parent::checkEntityAccess($op, $entity_type, $entity);
-
-        default:
-        case OS_PUBLIC_APP:
-          return parent::checkEntityAccess($op, $entity_type, $entity);
-      }
-    }
-  }
-  */
 
   /**
    * Display the id and the title of the group.
