@@ -59,7 +59,7 @@ class VsiteExportRestfulLayoutsOverrides extends \VsiteExportRestfulLayouts {
     // Set up the blocks layout.
     ctools_include('layout', 'os');
 
-// TODO layout field/object mapping
+    // TODO layout field/object mapping
     $blocks = os_layout_get($this->object->object_id, FALSE, FALSE, $this->space);
 
     foreach ($blocks as $delta => $block) {
@@ -109,7 +109,7 @@ class VsiteExportRestfulLayoutsOverrides extends \VsiteExportRestfulLayouts {
       if (is_array($layout)) {
 
 
-$sid = $this->request['vsite'];
+        $sid = $this->request['vsite'];
 
         foreach ($layout as $key => $block) {
 
@@ -163,15 +163,6 @@ $sid = $this->request['vsite'];
 
     $layouts = [];
     if($this->request['vsite']['sid'] && is_numeric($this->request['vsite']['sid'])){
-
-      /*
-      $vlb = db_select('vsite_layout_block', 'v')
-        ->condition('v.sid', $this->request['vsite']['sid'], '=')
-        ->fields('v', array('delta', 'context', 'module', 'region', 'weight'))
-        ->execute();
-
-      $layouts['vsite_layout_block'] = $vlb->fetchAll();
-      */
 
       ctools_include('layout', 'os');
 

@@ -73,11 +73,6 @@ class VsiteExportVocabulary extends VsiteExportRestfulEntityCacheableBase {
     }
 
   }
-  /*
-  protected function checkEntityAccess($op, $entity_type, $entity) {
-    return TRUE;
-  }
-  */
 
   /**
    * {@inheritdoc}

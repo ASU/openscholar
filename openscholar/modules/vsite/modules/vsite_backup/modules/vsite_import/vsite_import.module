@@ -347,8 +347,14 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   $item_type = key($item);
 
 
-  // TODO do another item type dispatcher as was done in exports or backup?
+  // Keeping all RESTful intake routines here, for consolidated maintenance, vs.
+  // dispatching to sub-functions.
 
+  // Set new vsite as og context and space for rest of operations, if available.
+  if (isset($context['results']['new_vsite_id'])) {
+    og_context('node', node_load($context['results']['new_vsite_id']));
+    vsite_get_vsite($context['results']['new_vsite_id']);
+  }
 
   // QUEUE PROCESSING ORDER:
   // vsite
@@ -362,13 +368,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   // vsite_layout_blocks
   // spaces_overrides
 
-
-  // Set new vsite as og context and space for rest of operations, if available.
-  if (isset($context['results']['new_vsite_id'])) {
-    og_context('node', node_load($context['results']['new_vsite_id']));
-    vsite_get_vsite($context['results']['new_vsite_id']);
-  }
-
   // VSITE
   if ($item_type == 'vsite') {
 
@@ -378,12 +377,61 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
     foreach ($item as $key => $value) {
 
-      // TODO what to do with field_organization term reference field?
-
       // POST method, to create.
       $request = $value[0];
       $old_id = $request['id'];
+
+error_log(var_export($request, 1));
+
+      unset($request['users']);
+      unset($request['self']);
+      unset($request['group_group']);
+      unset($request['field_group_path']);
+      //unset($request['purl']);
+
+      // TODO ??? move into clone/restore logic?
       unset($request['id']);
+
+      // Cloning with new name.
+      if (strtolower($clone['clone']) == 'clone') {
+        $request['label'] = strtolower($clone['name']);
+        $request['title'] = strtolower($clone['name']);
+        $request['purl'] = strtolower($clone['name']);
+        $request['field_group_path']['url'] = $GLOBALS['base_url'] . '/' . strtolower($clone['name']);
+      }
+
+//error_log(var_export($request, 1));
+//return;
+      // TODO Complete clone vs restore logic here...
+      //error_log(var_export($clone, 1));
+      //$clone['clone'];
+      // strip ids before calls
+      // use POST
+      //$clone['name'];
+      // leave ids
+      // try PATCH
+      // If failure, strip ID, try POST
+      // TODO
+      // RESTORE:
+      //    pathauto processing - pre or post handler call?
+      //
+      // CLONE:
+      //    pathauto - unset pre handler call
+
+      //if (strtolower($clone['clone']) == 'clone') {
+      //  // strip ids before calls
+      //  unset($request['id']);
+      //  // use POST
+      //  $method = 'post';
+      //}
+      //else {
+      //  //$method = 'patch';
+      //  $method = 'put';
+      //}
+      //$result = $handler->$method('', $request);
+      // TODO if patch can fail... have a fallback post here.
+
+
       $result = $handler->post('', $request);
       $new_id = $result[0]['id'];
 
@@ -391,19 +439,14 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       $context['results']['old_vsite_id'] = $old_id;
       $context['results']['new_vsite_id'] = $new_id;
 
-      // TODO Complete clone vs restore logic here...
-error_log(var_export($clone, 1));
-$clone['clone'];
-$clone['name'];
-
-
       // If we're cloning, use the user submitted name/purl.
       $purl = $clone['clone'] ? $clone['name'] : $request['purl'];
       purl_save(array('value' => $purl, 'provider' => 'spaces_og', 'id' => $new_id));
 
     }
   }
-
+//error_log('stop here');
+//return;
 
 // TODO handling for og, pathauto, file references, taxonomy term references, user references
   // pauthauto seems to get set automatically alright... haven't checked manual override values.
@@ -422,10 +465,9 @@ $clone['name'];
 
     foreach ($item as $key => $value) {
 
+
       // TODO
       // ADD to all nodes via classes....
-      // og_group_ref ... [LANGUAGE_NONE][0]['target_id'] = $context['results']['new_vsite_id'] = $new_id;
-      // og_vocabulary ... not used?
       // field_upload - on lots of nodes
       //
       // ADD to related node types
@@ -436,18 +478,13 @@ $clone['name'];
       // other reference fields? update with maps?
 
 
-      // TODO
-      // RESTORE:
-      //    pathauto processing - pre or post handler call?
-      //
-      // CLONE:
-      //    pathauto - unset pre handler call
-
+      // TODO implement clone/restore logic
 
 
       // POST method, to create.
       $request = $value[0];
       $old_id = $request['id'];
+
       unset($request['id']);
       unset($request['self']);
       // TODO eventual handling for these two
@@ -456,6 +493,7 @@ $clone['name'];
         // TODO Do stuff here to record file mapping details for later...
         unset($request['field_upload']);
       }
+
       $result = $handler->post('', $request);
       $new_id = $result[0]['id'];
 
@@ -470,21 +508,8 @@ $clone['name'];
   // TAXONOMY, global
   if ($item_type == 'global_org_taxonomy') {
 
-    /* TODO Don't want/need to create global org. Anything to do here?
-    $handler = restful_get_restful_handler('vocabulary', $major = 2, $minor = 0);
-    $out = $handler->getRequest();
+    // TODO Don't want/need to create global org. Anything to do here?
 
-    foreach ($item as $key => $value) {
-
-      // POST method, to create.
-      $request = $value[0];
-      //dpm($request);
-      unset($request['id']);
-      $result = $handler->post('', $request);
-      $id = $result[0]['id'];
-
-    }
-    */
   }
 
   // TAXONOMY and TERMS
@@ -505,18 +530,21 @@ $clone['name'];
       $request['machine_name'] = $request['machine_name'] . '_' . $i;
     }
 
-    // TODO where are extra {spaces_overrides} entries with old vsite_id getting triggered?
+
+    // TODO implement clone/restore logic
+
 
     $old_id = $request['id'];
+
     unset($request['id']);
     unset($request['self']);
     unset($request['form']);
     unset($request['tree']);
     unset($request['bundles']);
-    // POST method, to create.
 
     $request['vsite'] = $context['results']['new_vsite_id'];
 
+    // POST method, to create.
     $result = $handler->post('', $request);
     $vid = $result[0]['id'];
     $new_id = $result[0]['id'];
@@ -546,18 +574,22 @@ $clone['name'];
 
     foreach ($item['file'] as $key => $value) {
 
-      // POST method, to create.
+
+      // TODO implement clone/restore logic
+
+
       $request = $value;
       $old_id = $request['id'];
-      // Need this for copying files from import.
-      $request['import_file_dir'] = $import_file_dir;
 
       unset($request['id']);
       unset($request['self']);
 
+      // Need this for copying files from import.
+      $request['import_file_dir'] = $import_file_dir;
       // Needed for constructing path.
       $request['vsite'] = $context['results']['new_vsite_id'];
 
+      // POST method, to create.
       $result = $handler->post('', $request);
       $new_id = $result[0]['id'];
 
@@ -566,21 +598,28 @@ $clone['name'];
 
 
   // GLOBAL USER ROLES
-  // TODO We're not importing these... right? Just seems like a bad idea.
+  if ($item_type == 'global_user_roles') {
+
+    // TODO We're not importing these... right? Just seems like a bad idea.
+
+  }
 
 
   // GROUP USER ROLES
   if ($item_type == 'group_user_roles') {
 
-
     $handler = restful_get_restful_handler('roles', $major = 2, $minor = 0);
 
     foreach ($item['group_user_roles'] as $key => $value) {
 
-      // POST method, to create.
+
+      // TODO implement clone/restore logic
+
+
       $request = $value;
 
       $old_id = $request['id'];
+
       unset($request['id']);
       unset($request['self']);
       unset($request['rid']);
@@ -588,6 +627,7 @@ $clone['name'];
 
       $request['vsite'] = $context['results']['new_vsite_id'];
 
+      // POST method, to create.
       $result = $handler->post('', $request);
       $new_id = $result[0]['id'];
 
@@ -617,10 +657,10 @@ $clone['name'];
       // Default user intake.
       else {
 
-        // Check email. If exists, do nothing but save to mappings.
+        // Check email. If exists, do nothing but set up for save to mappings.
         if ($mail_acct = user_load_by_mail($request['mail'])) {
 
-          // TODO write to mappings
+          $new_id = $mail_acct->id;
 
         }
         else {
@@ -638,7 +678,9 @@ $clone['name'];
             $request['name'] = $request['name'] . $i;
           }
 
-          // TODO write to mappings
+
+          // TODO implement clone/restore logic
+
 
           // User doesn't exist. Create.
           $old_id = $request['id'];
