@@ -381,8 +381,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       $request = $value[0];
       $old_id = $request['id'];
 
-error_log(var_export($request, 1));
-
       unset($request['users']);
       unset($request['self']);
       unset($request['group_group']);
@@ -400,8 +398,6 @@ error_log(var_export($request, 1));
         $request['field_group_path']['url'] = $GLOBALS['base_url'] . '/' . strtolower($clone['name']);
       }
 
-//error_log(var_export($request, 1));
-//return;
       // TODO Complete clone vs restore logic here...
       //error_log(var_export($clone, 1));
       //$clone['clone'];
@@ -445,8 +441,6 @@ error_log(var_export($request, 1));
 
     }
   }
-//error_log('stop here');
-//return;
 
 // TODO handling for og, pathauto, file references, taxonomy term references, user references
   // pauthauto seems to get set automatically alright... haven't checked manual override values.
