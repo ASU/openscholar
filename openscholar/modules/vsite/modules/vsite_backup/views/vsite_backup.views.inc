@@ -71,8 +71,8 @@ function vsite_backup_views_data(){
     'title' => t('File ID'),
     'help' => t('The file ID of the exportable in relation to this item'),
     'field' => array(
-      'handler' => 'views_handler_field',
-      'click sortable' => FALSE,
+      'handler' => 'views_handler_field_markup',
+      'format' => 'full_html', // filtered_html, plain_text etc.
     ),
     'sort' => array(
       'handler' => 'views_handler_sort',

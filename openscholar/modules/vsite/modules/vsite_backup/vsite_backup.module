@@ -127,6 +127,20 @@ function vsite_backup_cron_queue_info() {
   return $queues;
 }
 
+/**
+ * Implements hook_views_pre_render().
+ */
+function vsite_backup_views_pre_render(&$view) {
+  if ($view->name == 'vsite_backup_exports') {
+    $results = &$view->result;
+    foreach ($results as $key => $result) {
+      if(!empty($result->vsite_backup_exports_fid)){
+        $result->vsite_backup_exports_fid = vsite_backup_build_download_link($result->vsite_backup_exports_fid);
+      }
+    }
+  }
+}
+
 /*****************************************************************************
  CALLBACKS
 ******************************************************************************/
@@ -179,6 +193,19 @@ function vsite_backup_export_page(){
 /*****************************************************************************
  INTERNAL
 ******************************************************************************/
+
+/**
+ * Generate a download link for an exported file
+ * @param $fid Integer File ID
+ * @return string HTML anchor containing download link
+ */
+function vsite_backup_build_download_link($fid){
+  $file = file_load($fid);
+  $link = file_create_url($file->uri);
+  $html = '<a href="' . $link . '" title="Download Link">' . $fid . '</a>';
+
+  return $html;
+}
 
 /**
  *  Returns the new ID of the imported item
