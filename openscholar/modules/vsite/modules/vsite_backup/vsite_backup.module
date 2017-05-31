@@ -72,6 +72,7 @@ function vsite_backup_os_restful_cp_menu_admin_panel_alter(&$menu){
  */
 function vsite_backup_menu()
 {
+
   $items['vsite-backup'] = array(
     'title' => t('Vsite Backup'),
     'description' => 'Vsite backup.',
@@ -79,10 +80,25 @@ function vsite_backup_menu()
     'access callback' => 'vsite_og_user_access',
     'access arguments' => array('access vsite backup'),
     'weight' => 50,
-    'menu_name' => 'vb',
+    'type' => MENU_NORMAL_ITEM,
   );
 
   return $items;
+}
+
+function vsite_backup_cp_toolbar_pre_render_alter(&$items){
+  $items['toolbar_left']['toolbar_menu']['#links']['vsite-backup'] = array(
+    'title' => t('Vsite Backup'),
+    'path' => "vsite-backup",
+    'page callback' => 'vsite_backup_export_page',
+    'access callback' => 'vsite_og_user_access',
+    'access arguments' => array('access vsite backup'),
+    'href' => "vsite-backup",
+    'description' => 'Create and download backups of your site',
+    'attributes' => array(
+      'data-tooltip' => 'Create and download backups of your site'
+    ),
+  );
 }
 
 /**
