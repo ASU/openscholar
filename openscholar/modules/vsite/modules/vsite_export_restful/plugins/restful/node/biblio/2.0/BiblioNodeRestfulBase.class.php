@@ -5,35 +5,19 @@ class BiblioNodeRestfulBase extends VsiteExportNodeRestfulBase {
   public function publicFieldsInfo() {
     $public_fields = parent::publicFieldsInfo();
 
-/*
-    $public_fields[''] = array(
-      'property' => '',
-      //'sub_property' => 'name',
-      //'process_callbacks' => array(
-      //  array($this, 'myProvidedValueCallback'),
-      //),
-      //'resource' => array( // sub request/reference - see docs/api_drupal.md
-      //  'tags' => 'tags',
-      //),
-    );
-
-    $public_fields[''] = array(
-      'property' => '',
-    );
-*/
 
     $public_fields['title_field'] = array(
       'property' => 'title_field',
     );
-    $public_fields['biblio_year'] = array(
-      'property' => 'biblio_year',
-    );
+    //$public_fields['biblio_year'] = array(
+    //  'property' => 'biblio_year',
+    //);
     $public_fields['biblio_type'] = array(
       'property' => 'biblio_type',
     );
-    $public_fields['other_fields'] = array(
-      'property' => 'other_fields',
-    );
+    //$public_fields['other_fields'] = array(
+    //  'property' => 'other_fields',
+    //);
     $public_fields['biblio_authors_field'] = array(
       'property' => 'biblio_authors_field',
     );

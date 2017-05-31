@@ -53,18 +53,35 @@ function vsite_export_get_group_content($og_context = NULL) {
 
     // Get exportable group/vsite entity content
 
-    if ($key != 'node') {
+    if (!in_array($key, array('node', 'file', 'user'))) {
       $og_contents = db_select('og_membership', 'ogm')
         ->fields('ogm', array('etid', 'type', 'entity_type'))
         ->condition('ogm.gid', $gid, '=')
         ->condition('ogm.entity_type', $key, '=') // Entity type
         ->execute()->fetchAll();
     }
-    else { // For nodes, get node bundle, too.
+    // And for the following we want to ensure the entities exist by using joins.
+    elseif ($key == 'node') { // Also get nodes...
       $og_nodes = db_select('og_membership', 'ogm');
       $og_nodes->join('node', 'n', 'n.nid = ogm.etid'); // Cannot be chained.
       $og_contents = $og_nodes->fields('ogm', array('etid', 'type', 'entity_type'))
         ->fields('n', array('type'))
+        ->condition('ogm.gid', $gid, '=')
+        ->condition('ogm.entity_type', $key, '=') // Entity type
+        ->execute()->fetchAll();
+    }
+    elseif ($key == 'file') { // ...and files...
+      $og_files = db_select('og_membership', 'ogm');
+      $og_files->join('file_managed', 'f', 'f.fid = ogm.etid'); // Cannot be chained.
+      $og_contents = $og_files->fields('ogm', array('etid', 'type', 'entity_type'))
+        ->condition('ogm.gid', $gid, '=')
+        ->condition('ogm.entity_type', $key, '=') // Entity type
+        ->execute()->fetchAll();
+    }
+    elseif ($key == 'user') { // ...and users.
+      $og_users = db_select('og_membership', 'ogm');
+      $og_users->join('users', 'u', 'u.uid = ogm.etid'); // Cannot be chained.
+      $og_contents = $og_users->fields('ogm', array('etid', 'type', 'entity_type'))
         ->condition('ogm.gid', $gid, '=')
         ->condition('ogm.entity_type', $key, '=') // Entity type
         ->execute()->fetchAll();
@@ -154,12 +171,6 @@ function vsite_export_get_group_spaces_overrides($og_context = NULL) {
 
   $exportables = array();
 
-
-//$exportables['spaces_overrides'] = $vsite_id;
-//return $exportables;
-
-  // contents of spaces_overrides table
-
   // select * from spaces_overrides where id = <vsite nid>;
   $results = db_query("SELECT * FROM {spaces_overrides} WHERE id  = :vsite_id", array(':vsite_id' => $vsite_id));
 
@@ -228,10 +239,6 @@ function vsite_export_get_vsite_layout_blocks($og_context = NULL) {
   $vsite_id = $gid;
 
   $exportables = array();
-
-
-//$exportables['vsite_layout_blocks'] = $vsite_id;
-//return $exportables;
 
   // select * from vsite_layout_block where sid = <vsite nid>;
   $results = db_query("SELECT * FROM {vsite_layout_block} WHERE sid  = :vsite_id", array(':vsite_id' => $vsite_id));
@@ -391,89 +398,3 @@ function vsite_export_get_vsite_exportables($vsite = NULL, $ordered = TRUE) {
  DEVELOPER NOTES
 ******************************************************************************/
 
-// PHASES
-// 1. Queuing (set cron job queue items)
-// 2. Processing (cron process 1: load queue item and any related content)
-// 3. Streaming (cron process 2: stream to .json file and/or copy file)
-// 4. Completion (queue is depleted)
-
-
-
-// TODO Cron processing of queue.
-  // TODO secure download build location.
-  // TODO process exportables from queue into RESTFUL representations
-  // TODO stream to JSON
-    // TODO Library module?
-  // TODO stream to XML
-    // TODO Library module?
-  // TODO saving files.
-
-
-/* Collect and Return
-X Vsite node
-x Users and their url aliases
-x All nodes associated with site and their url aliases
-x All files associated with site
-All vocabs and taxonomy terms for a site and their url aliases
-Vocabulary ID of the global Organizations vocabulary
-Contents of spaces_overrides table for the site
-  - select * from spaces_overrides where id = <vsite nid>;
-Feed Importers (used to create feed items, and shown in the news import interface)
-Permission sets for all roles, custom or not
-Which users get which roles
-
-
-EXTRAS to collect and return
-
-vsite_layout_block table
-  - NIX There is no vsite_layout_block table. It's stored in spaces_overrides. ... table exists?
-  - select * from vsite_layout_block_table where sid = <vsite nid>;
-
-biblio_contributors - just let them be created during node save if they do not exist
-
-URL aliases for nodes, vocabs/terms and users
-
-Field Collections - think field_department_school is the only one
-  - check for field collections to export
-  - do from export submit? or process during a swipe through cron? tokenized keys will count here
-
-Feed Importers and Feed Items.... Do we need these? I think the feed items can def be skipped and maybe the feed importers as well.
-Feed Importers and Feed Items: I think people will expect them to be included, and would want them so they can layout their site accurately.
-
-- HOLD - Redirects - We will need to copy over redirect entries?
-  - Redirects: I don't know. We should ask the clients.
-
-X Event Registration Information
-  - Event Registration: No. There's really no need, and it would cause registrants to receive multiple e-mails.
-
-
-X - I say we throw away all revision info
-  - revision info: We don't keep it anyway, do we?
-
-X - I say we throw away all drupal comments
-  - comments: I don't think anyone uses it, but yes, toss it.
-
-
-
-RESTFUL:
-
-Using programmatically: https://github.com/RESTful-Drupal/restful/wiki/Using-the-API-within-Drupal
-
-$handler = restful()
-  ->getResourceManager()
-  ->getPlugin('pictures:1.0');
-
-$get_result = restful()
-  ->getFormatterManager()
-  ->format($handler->doGet());
-
-$result = json_decode($get_result);
-
-
-*/
-
-// Get Users -- Keeping this. We may want to use this anyway, as it allows for
-// filtering based on OG membership state: To obtain only active, pending or
-// blocked users, you can put 'members__1', 'members__2' or 'members__3' in
-// place of 'members', like in this example:
-//$uids = og_get_group_members_properties($vsite_node, array(), 'members__' . OG_STATE_ACTIVE, 'node'); // Only active users.

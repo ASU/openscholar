@@ -518,16 +518,6 @@ function vsite_backup_write_export_item($data) {
     }
     $gz_fid = isset($managed_file->fid) ? $managed_file->fid : NULL;
 
-
-// TODO Document/update permissions changes in README.txt install instructions.
-// It should be 'view own private files' or somesuch.
-// TODO Test anonymous (un-permitted roles) cannot access tarball.
-// From docs at https://www.drupal.org/docs/7/core/modules/file/overview,
-// it's unclear whether file_entity control is required/effective. May need
-// something like https://api.drupal.org/api/drupal/modules!file!file.api.php/function/hook_file_download_access/7.x
-// but it's unclear if that would work outside of an entity context.
-
-
     // Change file ownership.
     $gz_file = file_load($gz_fid);
     $gz_file->uid = $data['uid']; // UID is included with finalize item.
