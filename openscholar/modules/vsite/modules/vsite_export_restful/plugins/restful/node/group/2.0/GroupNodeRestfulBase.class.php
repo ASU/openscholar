@@ -120,7 +120,7 @@ class GroupNodeRestfulBase extends VsiteExportNodeRestfulBase {
     self::cleanRequest($request);
     $wrapper->type->set($request['type']);
 
-    parent::setPropertyValues($wrapper, $null_missing_fields);
+//    parent::setPropertyValues($wrapper, $null_missing_fields);
     $id = $wrapper->getIdentifier();
 
     if (!$space = vsite_get_vsite($id)) {
@@ -155,6 +155,8 @@ class GroupNodeRestfulBase extends VsiteExportNodeRestfulBase {
     $wrapper = entity_metadata_wrapper($this->entityType, $entity);
 
     $this->setPropertyValues($wrapper);
+
+    $wrapper->save();
 
     return array($this->viewEntity($wrapper->getIdentifier()));
   }
