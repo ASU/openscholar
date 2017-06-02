@@ -303,6 +303,240 @@ function _vsite_import_track_unpacked_file($file, $all_files, &$context){
 }
 
 /**
+ * TODO START Restore logic
+ */
+
+/**
+ * Check to see that the site is being restored to a previous state rather than cloned.
+ * @param $item Array of vsite information
+ * @param $clone bool True if we are cloning. False if restoring
+ * @return bool
+ */
+function vsite_import_check_restore($item, $clone){
+  // Stop if we are trying to clone
+  if($clone['clone'] == false){
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Verifies that the restoring vsite exists on the site
+ * @param $purl String namespace
+ * @return bool
+ */
+function vsite_import_verify_namespace($purl){
+
+  $result = db_select('purl', 'p')->fields('p')->condition('value', $purl, '=')->execute()->fetchAssoc();
+  if($result !== false){
+    return true;
+  }
+
+  $msg = "Failed to verify that a namespace exists for the site being restored";
+  drupal_set_message($msg, "error");
+  watchdog("vsite import", $msg);
+
+  return false;
+}
+
+/**
+ * Runs the restore re-namespacing process
+ * @param $item Vsite information
+ * @param $clone Clone/Restore checkbox value
+ * @return array|bool Array of items necessary to undo the restore in case of failure, or false if the renaming fails
+ */
+function vsite_import_do_restore($item, $clone){
+
+  if(vsite_import_check_restore($item, $clone)){
+    // Verify we have a target namespace, and that the namespace exists
+    if(!empty($item['purl']) && vsite_import_verify_namespace($item['purl'])){
+      $complete = vsite_import_namespace_original($item);
+
+      // Only return information if the vsite was successfully re-namespaced
+      if($complete !== false){
+        return $complete;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Update the purl value of the vsite being restored
+ * @param $original
+ * @param $new
+ * @return bool
+ */
+function vsite_import_update_purl($original, $new){
+  $num_updated = db_update('purl') // Table name no longer needs {}
+  ->fields(array('value' => $new))
+    ->condition('value', $original, '=')
+    ->execute();
+
+  if($num_updated !== 0){
+    return true;
+  }
+  watchdog('vsite import', 'Failed to update the purl table');
+  return false;
+}
+
+/**
+ * Get all nodes that may be referencing the old namespace
+ * @param $item
+ * @return array|bool
+ */
+function vsite_import_get_referencing_nodes($item){
+  $results = false;
+  $nodes = array();
+
+  $gid = $item['id'];
+
+  $result = db_query("SELECT * FROM {og_membership} m WHERE m.gid = :gid AND m.entity_type = :etype ", array(':gid' => $gid, ':etype' => 'node'));
+
+  foreach ($result as $row){
+    $results = true;
+    array_push($nodes, $row);
+  }
+
+  if($results == true){
+    return $nodes;
+  }
+
+  return false;
+
+}
+
+/**
+ * Update URL aliases in the url_alias table to match the new namespace
+ * @param $nodes Array of node rows from og_membership that relate to the vsite
+ * @param $purl String original purl
+ * @param $new_space String new purl namespace
+ * @return array|bool
+ */
+function vsite_import_update_url_aliases($nodes, $purl, $new_space){
+
+  try {
+    $aliases = array();
+
+    foreach($nodes as $node){
+
+      // Check that the items exist in url_alias
+      $selected = db_select('url_alias', 'a')
+        ->fields('a')
+        ->condition('source', 'node/' . $node->id, '=')
+        ->condition('alias', db_like($purl . '/') . '%', 'LIKE')
+        ->execute()
+        ->fetchAssoc();
+
+      if($selected !== false){
+        // If items exist, update their aliases
+        $new_alias = str_replace($purl, $new_space, $selected['alias']);
+        $aliases[$selected['alias']] = $new_alias;
+        db_update('url_alias')
+          ->fields(array('alias' => $new_alias))
+          ->condition('alias', $selected['alias'], '=')
+          ->execute();
+      }
+    }
+    if(!empty($aliases)){
+      return $aliases;
+    }
+  } catch (Exception $e) {
+    watchdog('vsite import', $e);
+  }
+
+  watchdog("vsite import", "Failed to update URL aliases during import");
+  return false;
+}
+
+/**
+ * Change the currently existing namespace so that it does not conflict with the new one
+ * @param $item
+ * @return array|bool
+ */
+function vsite_import_namespace_original($item){
+
+  $newspace = vsite_import_build_legacy($item['purl']);
+  if($newspace !== false){
+    $purl_complete = vsite_import_update_purl($item['purl'], $newspace);
+    $re_point = vsite_import_get_referencing_nodes($item);
+    $aliases = vsite_import_update_url_aliases($re_point, $item['purl'], $newspace);
+    if($purl_complete !== false && $re_point !== false && $aliases !== false){
+      $complete = array(
+        "ref_nodes" => $re_point,
+        "purls" => $aliases
+      );
+
+      return $complete;
+    }
+    /**
+     * TODO If some failure use aliases, new namespace, and original namespace to restore the previous namespace
+     */
+  }
+  return false;
+}
+
+/**
+ * Build a new namespace string for the site being restored
+ * @param $purl
+ * @return bool|string
+ */
+function vsite_import_build_legacy($purl){
+
+  try {
+
+    $untouched = true;
+    $rows = array();
+    $result = db_query("SELECT * FROM {purl} p WHERE p.value LIKE :term", array(':term' => db_like($purl) . '_orig%'));
+
+    // If there have been other restores, we want to see their namespaces
+    foreach ($result as $row){
+      $untouched = false;
+      array_push($rows, $row);
+    }
+
+    // Generate a potential namespace
+    $potential = $purl . "_orig";
+
+    // Return if there won't be any conflict
+    if($untouched == true){
+      return $potential;
+    }
+    else {
+
+      $biggest = 0;
+
+      // Loop through every pre-existing namespace, and iterate the ending count to avoid collisions
+      foreach ($rows as $row){
+        $parts = explode($potential, $row->value);
+        if($parts[1] > $biggest){
+          $biggest = $parts[1];
+        }
+      }
+      $biggest = $biggest + 1;
+      $potential = $potential . $biggest;
+    }
+
+    return $potential;
+
+  } catch (Exception $e) {
+    watchdog("vsite import", $e);
+  }
+
+  $msg = "Unable to create a new namespace for the site being rolled back.";
+  drupal_set_message($msg, "error");
+  watchdog("vsite import", $msg);
+
+  return false;
+
+}
+// TODO Need a method of rolling back a failed restore
+/**
+ * TODO END Restore logic
+ */
+
+/**
  * Process a single line.
  *
  * @param $filepath String Path to file
@@ -346,7 +580,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   $item = drupal_json_decode($line);
   $item_type = key($item);
 
-
   // Keeping all RESTful intake routines here, for consolidated maintenance, vs.
   // dispatching to sub-functions.
 
@@ -370,6 +603,12 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
   // VSITE
   if ($item_type == 'vsite') {
+
+    $respaced = vsite_import_do_restore($item['vsite'][0], $clone);
+    /**
+     * TODO use $respaced variable to undo space changing in case vsite import fails, after cleaning up the failed import
+     */
+
 
     // TODO (ASU) add lab type RESTful resource
 
