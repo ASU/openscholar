@@ -12,15 +12,38 @@ class MediaGalleryNodeRestfulBase extends VsiteExportNodeRestfulBase {
     $public_fields['title'] = array(
       'property' => 'title',
     );
+
     $public_fields['media_gallery_description'] = array(
       'property' => 'media_gallery_description',
+      'sub_property' => 'value',
     );
-    $public_fields['media_gallery_file'] = array(
-      'property' => 'media_gallery_file',
+    $public_fields['media_gallery_description_format'] = array(
+      'property' => 'media_gallery_description',
+      'sub_property' => 'format',
     );
     $public_fields['media_gallery_format'] = array(
       'property' => 'media_gallery_format',
+      //'sub_property' => 'value',
     );
+    $public_fields['media_gallery_file'] = array(
+      'property' => 'media_gallery_file',
+      //'sub_property' => 'fid',
+    );
+    /*
+    $public_fields['media_gallery_file_fid'] = array(
+      'property' => 'media_gallery_file',
+      'sub_property' => 'fid',
+    );
+    $public_fields['media_gallery_file_display'] = array(
+      'property' => 'media_gallery_file',
+      'sub_property' => 'display',
+    );
+    $public_fields['media_gallery_file_description'] = array(
+      'property' => 'media_gallery_file',
+      'sub_property' => 'description',
+    );
+    */
+
     $public_fields['media_gallery_lightbox_extras'] = array(
       'property' => 'media_gallery_lightbox_extras',
     );

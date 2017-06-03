@@ -727,15 +727,103 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
         unset($request['field_upload']);
       }
 
-      $result = $handler->post('', $request);
-      $new_id = $result[0]['id'];
+      // TODO add to all?
+      // If CLONE
+      if (strtolower($clone['clone']) === 'clone') {
+        $request['vsite']['title'] = $clone['name'];
+        $request['vsite']['id'] = $context['results']['new_vsite_id'];
 
-      // Set group context with the new_vsite_id.
-      og_group('node', $context['results']['new_vsite_id'], array('entity_type' => 'node', 'entity' => node_load($new_id)));
+        // og_group_ref remapping, if needed.
+        if (isset($request['og_group_ref'])) {
+          foreach ($request['og_group_ref'] as $key => $value) {
+            $request['og_group_ref'][$key]['vid'] = vsite_backup_get_new_mapping($vsite_id = $context['results']['old_vsite_id'], $original_id = $value['vid']);
+          }
+        }
+      }
+
+// TODO resolve import file errors...
+
+      if ($node_type == 'media_gallery') {
+
+        drupal_set_message(t("@type node type skipped. Currently not supported. It can be manually recreated with raw content pulled from the import's JSON file.", array('@type' => $node_type)));
+
+        // TODO support media_gallery node types.
+        // media_gallery_file field is erroring out hard, and there may be other
+        // issues with this node type, so for now we're not supporting it.
+        $skip_node_type = TRUE;
+
+       /*
+        $request['og_group_ref'][LANGUAGE_NONE][0]['target_id'] = $context['results']['new_vsite_id'];
+        // TODO do a mapping lookup and swap out ids.
+        if (isset($request['media_gallery_file'])) {
+          unset($request['media_gallery_file']);
+          foreach ($request['media_gallery_file'] as $key => $value) {
+
+            $new_fid = vsite_backup_get_new_mapping($vsite_id = $context['results']['old_vsite_id'], $original_id = $value['fid']);
+            $new_file = (array)file_load($new_fid);
+
+            //$request['media_gallery_file'][LANGUAGE_NONE][$key] = $new_file;
+            $request['media_gallery_file'][LANGUAGE_NONE][$key]['fid'] = $new_fid; // TODO or file?
+            unset($request['media_gallery_file'][$key]);
+            unset($request['media_gallery_file'][LANGUAGE_NONE][$key]['og_group_ref']);
+
+          }
+        }
+
+       */
+      }
+
+      if ($node_type == 'news') {
+
+        drupal_set_message(t("@type node type skipped. Currently not supported. It can be manually recreated with raw content pulled from the import's JSON file.", array('@type' => $node_type)));
+
+        // TODO support news node types.
+        // field_news_date field is erroring out.
+        $skip_node_type = TRUE;
+        // TODO support this field
+        //unset($request[0]['field_news_date']);
+
+      }
+
+      if ($node_type == 'person') {
+
+        drupal_set_message(t("@type node type skipped. Currently not supported. It can be manually recreated with raw content pulled from the import's JSON file.", array('@type' => $node_type)));
+
+        // TODO support news node types.
+        // fields are erroring out.
+        $skip_node_type = TRUE;
+        // TODO support these fields
+        //unset($request[0]['field_destination_url']);
+        //unset($request[0]['field_original_destination_url']);
+        //unset($request[0]['field_uuid']);
+
+      }
+
+      if ($node_type == 'presentation') {
+
+        drupal_set_message(t("@type node type skipped. Currently not supported. It can be manually recreated with raw content pulled from the import's JSON file.", array('@type' => $node_type)));
+
+        // TODO support presentation node types.
+        // fields are erroring out.
+        $skip_node_type = TRUE;
+        // TODO support these fields
+        //unset($request[0]['field_presentation_date']);
+
+      }
+
+
+      // Allow for skipping node types due to support issues not yet addressed.
+      if (!$skip_node_type) {
+
+        $result = $handler->post('', $request);
+        $new_id = $result[0]['id'];
+
+        // Set group context with the new_vsite_id.
+        og_group('node', $context['results']['new_vsite_id'], array('entity_type' => 'node', 'entity' => node_load($new_id)));
+      }
 
     }
   }
-
 
 
   // TAXONOMY, global

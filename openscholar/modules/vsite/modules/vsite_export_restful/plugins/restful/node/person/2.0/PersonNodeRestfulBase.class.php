@@ -45,14 +45,19 @@ class PersonNodeRestfulBase extends VsiteExportNodeRestfulBase {
     $public_fields['field_url'] = array(
       'property' => 'field_url',
     );
+
+
     $public_fields['field_destination_url'] = array(
       'property' => 'field_destination_url',
+      //'sub_property' => '???',
     );
     $public_fields['field_uuid'] = array(
       'property' => 'field_uuid',
+      //'sub_property' => '???',
     );
     $public_fields['field_original_destination_url'] = array(
       'property' => 'field_original_destination_url',
+      //'sub_property' => '???',
     );
 
 
