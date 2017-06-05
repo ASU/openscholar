@@ -583,14 +583,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   array_push($path_explode, "files/"); // Add files subdir. TODO Make this less hardcoded?
   $import_file_dir = implode("/", $path_explode);
 
-
-// TODO add in clone/restore logic
-  // do restore as actual restore or do delete/refresh?
-  // TODO make it a difference between a POST vs PUT in handler call? (plus sanitation? of id values)
-  // but... restore could be on site with deleted stuff.... so maybe just do
-  // 1. if restore, delete old, POST restore with new IDs, but try and keep pathauto values.
-  // 2. if clone, leave original alone, POST copy with new IDs, and sanitize pathauto values.
-
   // Trim off larger JSON array cruft. We treat each row as independent objects.
   // Double quotes are essential for proper interpretation of trim() param.
   $line = trim($line, "[], \t\n\r\0\x0B");
@@ -655,36 +647,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
         $request['field_group_path']['url'] = $GLOBALS['base_url'] . '/' . strtolower($clone['name']);
       }
 
-      // TODO Complete clone vs restore logic here...
-      //error_log(var_export($clone, 1));
-      //$clone['clone'];
-      // strip ids before calls
-      // use POST
-      //$clone['name'];
-      // leave ids
-      // try PATCH
-      // If failure, strip ID, try POST
-      // TODO
-      // RESTORE:
-      //    pathauto processing - pre or post handler call?
-      //
-      // CLONE:
-      //    pathauto - unset pre handler call
-
-      //if (strtolower($clone['clone']) == 'clone') {
-      //  // strip ids before calls
-      //  unset($request['id']);
-      //  // use POST
-      //  $method = 'post';
-      //}
-      //else {
-      //  //$method = 'patch';
-      //  $method = 'put';
-      //}
-      //$result = $handler->$method('', $request);
-      // TODO if patch can fail... have a fallback post here.
-
-
       $result = $handler->post('', $request);
       $new_id = $result[0]['id'];
 
@@ -699,9 +661,8 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
     }
   }
 
-// TODO handling for og, pathauto, file references, taxonomy term references, user references
+// TODO handling for pathauto, file references, taxonomy term references, user references
   // pauthauto seems to get set automatically alright... haven't checked manual override values.
-  // og is set automatically on some, can be set like in NODE below with og_group()
 
   // file refs
   // Taxonomy term refs
@@ -729,9 +690,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       // other reference fields? update with maps?
 
 
-      // TODO implement clone/restore logic
-
-
       // POST method, to create.
       $request = $value[0];
       $old_id = $request['id'];
@@ -745,21 +703,8 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
         unset($request['field_upload']);
       }
 
-      // TODO add to all?
-      // If CLONE
-      if (strtolower($clone['clone']) === 'clone') {
-        $request['vsite']['title'] = $clone['name'];
-        $request['vsite']['id'] = $context['results']['new_vsite_id'];
-
-        // og_group_ref remapping, if needed.
-        if (isset($request['og_group_ref'])) {
-          foreach ($request['og_group_ref'] as $key => $value) {
-            $request['og_group_ref'][$key]['vid'] = vsite_backup_get_new_mapping($vsite_id = $context['results']['old_vsite_id'], $original_id = $value['vid']);
-          }
-        }
-      }
-
-// TODO resolve import file errors...
+      // Massage $request, if we're cloning.
+      _vsite_import_line_massage_request($request, $context, $clone);
 
       if ($node_type == 'media_gallery') {
 
@@ -869,10 +814,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       $request['machine_name'] = $request['machine_name'] . '_' . $i;
     }
 
-
-    // TODO implement clone/restore logic
-
-
     $old_id = $request['id'];
 
     unset($request['id']);
@@ -882,6 +823,9 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
     unset($request['bundles']);
 
     $request['vsite'] = $context['results']['new_vsite_id'];
+
+    // Massage $request, if we're cloning.
+    _vsite_import_line_massage_request($request, $context, $clone);
 
     // POST method, to create.
     $result = $handler->post('', $request);
@@ -913,10 +857,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
     foreach ($item['file'] as $key => $value) {
 
-
-      // TODO implement clone/restore logic
-
-
       $request = $value;
       $old_id = $request['id'];
 
@@ -928,9 +868,14 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       // Needed for constructing path.
       $request['vsite'] = $context['results']['new_vsite_id'];
 
+      _vsite_import_line_massage_request($request, $context, $clone);
+
       // POST method, to create.
       $result = $handler->post('', $request);
       $new_id = $result[0]['id'];
+
+      // Set group context with the new_vsite_id.
+      og_group('node', $context['results']['new_vsite_id'], array('entity_type' => 'file', 'entity' => file_load($new_id)));
 
     }
   }
@@ -950,10 +895,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
     $handler = restful_get_restful_handler('roles', $major = 2, $minor = 0);
 
     foreach ($item['group_user_roles'] as $key => $value) {
-
-
-      // TODO implement clone/restore logic
-
 
       $request = $value;
 
@@ -1018,18 +959,21 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
           }
 
 
-          // TODO implement clone/restore logic
-
-
           // User doesn't exist. Create.
           $old_id = $request['id'];
           unset($request['id']);
           unset($request['uid']);
           unset($request['self']);
           unset($request['create_access']);
+
+          // Massage $request, if we're cloning.
+          _vsite_import_line_massage_request($request, $context, $clone);
+
           $result = $handler->post('', $request);
           $new_id = $result[0]['id'];
 
+          // Set group context with the new_vsite_id.
+          og_group('node', $context['results']['new_vsite_id'], array('entity_type' => 'user', 'entity' => user_load($new_id)));
 
         }
       }
@@ -1050,6 +994,9 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
       $request['vsite'] = $context['results']['new_vsite_id'];
 
+      // Massage $request, if we're cloning.
+      _vsite_import_line_massage_request($request, $context, $clone);
+
       $result = $handler->post('', $request);
 
     }
@@ -1066,6 +1013,11 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       $request = $value;
 
       $request['vsite'] = $context['results']['new_vsite_id'];
+
+
+      // Massage $request, if we're cloning.
+      _vsite_import_line_massage_request($request, $context, $clone);
+
 
       $result = $handler->post('', $request);
 
@@ -1178,6 +1130,31 @@ function vsite_import_finished_callback($success, $results, $operations){
   }
 
   // TODO Purge mappings, success or failure. Using export_id.
+
+}
+
+/**
+ * Internal function used to massage import line/request based on whether we are
+ * cloning or not.
+ *
+ * @param $request
+ * @param $context
+ * @param $clone
+ */
+function _vsite_import_line_massage_request(&$request, $context, $clone) {
+
+  // If cloning...
+  if (strtolower($clone['clone']) === 'clone') {
+    $request['vsite']['title'] = $clone['name'];
+    $request['vsite']['id'] = $context['results']['new_vsite_id'];
+
+    // og_group_ref remapping, if needed.
+    if (isset($request['og_group_ref'])) {
+      foreach ($request['og_group_ref'] as $key => $value) {
+        $request['og_group_ref'][$key]['vid'] = vsite_backup_get_new_mapping($vsite_id = $context['results']['old_vsite_id'], $original_id = $value['vid']);
+      }
+    }
+  }
 
 }
 /*****************************************************************************
