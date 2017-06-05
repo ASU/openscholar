@@ -451,6 +451,23 @@ function vsite_import_update_url_aliases($nodes, $purl, $new_space){
 }
 
 /**
+ * Update existing vsite node titles
+ * @param $nid
+ * @param $title
+ */
+function vsite_import_update_title($nid, $title){
+  db_update('node')
+    ->fields(array('title' => $title))
+    ->condition('nid', $nid, '=')
+    ->execute();
+
+  db_update('node_revision')
+    ->fields(array('title' => $title))
+    ->condition('nid', $nid, '=')
+    ->execute();
+}
+
+/**
  * Change the currently existing namespace so that it does not conflict with the new one
  * @param $item
  * @return array|bool
@@ -462,6 +479,7 @@ function vsite_import_namespace_original($item){
     $purl_complete = vsite_import_update_purl($item['purl'], $newspace);
     $re_point = vsite_import_get_referencing_nodes($item);
     $aliases = vsite_import_update_url_aliases($re_point, $item['purl'], $newspace);
+    vsite_import_update_title($item['id'], $newspace);
     if($purl_complete !== false && $re_point !== false && $aliases !== false){
       $complete = array(
         "ref_nodes" => $re_point,
