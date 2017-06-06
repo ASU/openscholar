@@ -619,9 +619,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
      * TODO use $respaced variable to undo space changing in case vsite import fails, after cleaning up the failed import
      */
 
-
-    // TODO (ASU) add lab type RESTful resource
-
     $handler = restful_get_restful_handler('group', $major = 2, $minor = 0);
 
     foreach ($item as $key => $value) {
