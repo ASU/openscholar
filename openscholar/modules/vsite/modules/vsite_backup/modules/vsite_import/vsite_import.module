@@ -576,7 +576,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
   $context['results']['rows_imported']++;
 
-
   // For when we need to pass the import source directory path:
   $path_explode = explode("/", $filepath);
   array_pop($path_explode); // Remove tarball name.
@@ -633,7 +632,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       unset($request['field_group_path']);
       //unset($request['purl']);
 
-      // TODO ??? move into clone/restore logic?
       unset($request['id']);
 
       // Cloning with new name.
@@ -683,7 +681,7 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       // field_presentation_file ? in presentation
       // field_software_package ? in software release
       // media_gallery_file ? media gallery
-      //   TODO handling of files...
+      //   TODO handling of file fields...
       // other reference fields? update with maps?
 
 
@@ -987,6 +985,14 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       // POST method, to create.
       $request = $value;
 
+      // Parse all items contained in this line and update SID to the new Vsite
+      // ID.
+      foreach ($request as $k1 => $v1) {
+        foreach ($v1 as $k2 => $v2) {
+          $request[$k1][$k2]['sid'] = $context['results']['new_vsite_id'];
+        }
+      }
+
       unset($request['id']);
 
       $request['vsite'] = $context['results']['new_vsite_id'];
@@ -999,7 +1005,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
     }
   }
 
-
   // SPACES OVERRIDES
   if ($item_type == 'spaces_overrides') {
 
@@ -1008,6 +1013,12 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
       // POST method, to create.
       $request = $value;
+
+      // Parse all items contained in this line and update ID to the new Vsite
+      // ID.
+      foreach ($request as $k1 => $v1) {
+        $request[$k1]['id'] = $context['results']['new_vsite_id'];
+      }
 
       $request['vsite'] = $context['results']['new_vsite_id'];
 
@@ -1056,7 +1067,8 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   }
 
 
-  // TODO In the batch finalize operation, we could clear out the mappings table, maybe.
+  // TODO In the batch finalize operation, we could clear out the mappings
+  // table, maybe.
 
 
   /**
