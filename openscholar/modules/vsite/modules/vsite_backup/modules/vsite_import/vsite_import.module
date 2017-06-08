@@ -919,8 +919,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       // POST method, to create after checking existence.
       $request = $value;
 
-// TODO (ASU) write our own hook_vsite_import_user() for CAS?
-
       // Allow for hook_vsite_import_user() to completely override user creation
       // process. If you use CAS or some other user provisioning service, this
       // is what you want.
@@ -1041,8 +1039,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       'export_id' => $context['results']['old_vsite_id'],
       // Use the old Vsite ID.
       'type' => $item_type,
-      // TODO col not used? Problem: reserved word.
-      //'column' => 'blah',
       'export_item_id' => $old_id,
       'import_item_id' => $new_id,
     );
@@ -1057,8 +1053,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
         'export_id' => $context['results']['old_vsite_id'],
         // Use the old Vsite ID.
         'type' => 'taxonomy_term',
-        // TODO col not used? Problem: reserved word.
-        //'column' => 'blah',
         'export_item_id' => $old_term_ids[$k],
         'import_item_id' => $new_term_ids[$k],
       );

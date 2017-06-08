@@ -146,7 +146,6 @@ function vsite_backup_schema() {
    * Import ID: ID of the complete import being performed
    * Export ID: The ID of the export file being used
    * Type: The type of item being mapped. Should probably be verbose enough to point to a specific table ex. taxonomy, node
-   * Column: Point to the column being updated inside of the table referenced by {type}
    * Export Item ID: The ID pulled from the export file
    * Import Item ID: The ID being mapped to
    *
@@ -175,13 +174,6 @@ function vsite_backup_schema() {
       ),
       'type' => array(
         'description' => 'Type of item having its ID mapped. Must be referencable in the DB.',
-        'type' => 'varchar',
-        'length' => 64,
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      'column' => array(
-        'description' => 'The name of the column that will be affected by the mapping IDs.',
         'type' => 'varchar',
         'length' => 64,
         'not null' => TRUE,
