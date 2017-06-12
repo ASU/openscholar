@@ -685,6 +685,11 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       // other reference fields? update with maps?
 
 
+// TODO in NODES after creation each line... or in finalize?
+//  datestamp and datetime field types
+//  file and image field types
+
+
       // POST method, to create.
       $request = $value[0];
       $old_id = $request['id'];
@@ -1061,10 +1066,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   }
 
 
-  // TODO In the batch finalize operation, we could clear out the mappings
-  // table, maybe.
-
-
   /**
    * Simply show the import row count.
    */
@@ -1104,6 +1105,52 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
  */
 function vsite_import_finished_callback($success, $results, $operations){
 
+  $new_vsite_id = $results['new_vsite_id'];
+  $old_vsite_id = $results['old_vsite_id'];
+
+
+  // Look up reference fields, and do remapping of values.
+
+  // TODO - once this chunk of code works, make it its own function.
+  $entityreferences = _vsite_import_get_entityreferences_settings($new_vsite_id);
+
+  $tax_term_refs = _vsite_import_get_tax_term_refs_settings($new_vsite_id);
+  // TODO - also do code like below for ^^^ tax_term_refs.
+
+  // TODO Possible performance overload chokepoint here. If we run into
+  // whitescreening or timeouts, these should be processed via multiple
+  // batch iterations in their own op.
+
+  foreach ($entityreferences['entities'] as $key => $value) {
+
+    $new_target_id = vsite_backup_get_new_mapping($old_vsite_id, $original_id = $value['target_id']);
+
+// TODO new_target_id lookup not returning anything? are mapped records saved right? problem with lookup?
+//dpm('$new_target_id');
+//dpm($new_target_id);
+
+    // Dynamically load entity type.
+    $entity_load_func = $entityreferences['entities'][$key]['entity_type'] . '_load';
+    $entity = $entity_load_func($value['source_id']);
+
+
+    // TODO now we need the field name....
+    $field_name = $value['field_name'];
+
+
+    // TODO set new field value(s) on entity
+    // [LANGUAGE_NONE][0] ... [N]['target_id']
+    $entity_save_func = $entityreferences['entities'][$key]['entity_type'] . '_save';
+
+    // TODO save entity
+
+  }
+
+// COMMENT OUT TO DEBUG
+  // Purge mappings now, success or failure. Using export_id.
+  db_query('DELETE FROM {vsite_backup_import_mappings} WHERE export_id = :eid', array(':eid' => $old_vsite_id));
+
+
   if ($success) {
     // Attempt to remove the files used for the import
     try {
@@ -1132,8 +1179,6 @@ function vsite_import_finished_callback($success, $results, $operations){
     drupal_set_message($message, 'error');
   }
 
-  // TODO Purge mappings, success or failure. Using export_id.
-
 }
 
 /**
@@ -1160,6 +1205,115 @@ function _vsite_import_line_massage_request(&$request, $context, $clone) {
   }
 
 }
+
+/**
+ * Helper function to get details on entityreference fields and their content.
+ *
+ * @param null $vsite_id
+ * @return array
+ */
+function _vsite_import_get_entityreferences_settings($vsite_id = NULL) {
+
+  $entity_ids = $field_names = $settings = array();
+
+  // Get all entityreference field names
+  $query = db_select('field_config', 'f');
+  $query->fields('f', array('field_name'));
+  $query->condition('f.type', 'entityreference');
+  $query->distinct();
+  $rows = $query->execute();
+
+  foreach ($rows as $row) {
+    $field_name = $row->field_name;
+    $field_names[] = $field_name;
+  }
+
+  // Loop all entityreference fields. Get all source and target IDs.
+  foreach ($field_names as $field_name) {
+    $table = 'field_data_' . $field_name;
+    $target_id = $field_name . '_target_id';
+
+    $query = db_select($table, 'f');
+    $query->fields('f', array('entity_id', $target_id, 'entity_type', 'bundle'));
+    $query->distinct();
+    // If we had a Vsite ID supplied, require og_membership to that site.
+    if ($vsite_id) {
+      $query->innerJoin('og_membership', 'om', 'om.etid = f.entity_id');
+      $query->condition('om.gid', $vsite_id, "=");
+    }
+    $rows = $query->execute();
+
+    foreach ($rows as $row) {
+      $entity_ids[$row->entity_id] = array(
+        'entity_type' => $row->entity_type,
+        'bundle' => $row->bundle,
+        'field_name' => $field_name,
+        'target_id' => $row->{$target_id},
+        'source_id' => $row->entity_id,
+      );
+    }
+  }
+
+  return array(
+    'entities' => $entity_ids,
+  );
+}
+
+/**
+ * Helper function to get details on taxonomy_term_reference fields and their
+ * content.
+ *
+ * @param null $vsite_id
+ * @return array
+ */
+function _vsite_import_get_tax_term_refs_settings($vsite_id = NULL) {
+
+  $entity_ids = $field_names = $settings = array();
+
+  // Get all taxonomy_term_reference field names
+  $query = db_select('field_config', 'f');
+  $query->fields('f', array('field_name'));
+  $query->condition('f.type', 'taxonomy_term_reference');
+  $query->distinct();
+  $rows = $query->execute();
+
+  foreach ($rows as $row) {
+    $field_name = $row->field_name;
+    $field_names[] = $field_name;
+  }
+
+  // Loop all taxonomy_term_reference fields. Get all source and target IDs.
+  foreach ($field_names as $field_name) {
+    $table = 'field_data_' . $field_name;
+    $target_id = $field_name . '_tid';
+
+    $query = db_select($table, 'f');
+    $query->fields('f', array('entity_id', $target_id, 'entity_type', 'bundle'));
+    $query->distinct();
+    // If we had a Vsite ID supplied, require og_membership to that site.
+    if ($vsite_id) {
+      $query->innerJoin('og_membership', 'om', 'om.etid = f.entity_id');
+      $query->condition('om.gid', $vsite_id, "=");
+    }
+    $rows = $query->execute();
+
+    foreach ($rows as $row) {
+      $entity_ids[$row->{$target_id}] = array(
+        'entity_type' => $row->entity_type,
+        'bundle' => $row->bundle,
+        'field_name' => $field_name,
+        'target_id' => $row->{$target_id},
+        'source_id' => $row->entity_id,
+      );
+    }
+  }
+
+  return array(
+    'entities' => $entity_ids,
+  );
+}
+
+
 /*****************************************************************************
 THEME
  ******************************************************************************/
@@ -1172,3 +1326,9 @@ API
 DEVELOPER NOTES
  ******************************************************************************/
 
+// TODO The import process uses the original vsite_id as the export_id in the
+// {vsite_backup_import_mappings} table. Possibility for conflict there. Given
+// that import functionality is geared towards big-boss admins, and that the
+// mappings records are purged after import, the likelihood of this being an
+// issue is low. But it exists. Would be better to add a random value to the
+// ID.
