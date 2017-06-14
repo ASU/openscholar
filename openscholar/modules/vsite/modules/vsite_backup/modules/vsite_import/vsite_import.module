@@ -1110,43 +1110,9 @@ function vsite_import_finished_callback($success, $results, $operations){
 
 
   // Look up reference fields, and do remapping of values.
+  _vsite_import_update_entityreferences_mappings($old_vsite_id, $new_vsite_id);
+  _vsite_import_update_tax_term_refs_mappings($old_vsite_id, $new_vsite_id);
 
-  // TODO - once this chunk of code works, make it its own function.
-  $entityreferences = _vsite_import_get_entityreferences_settings($new_vsite_id);
-
-  $tax_term_refs = _vsite_import_get_tax_term_refs_settings($new_vsite_id);
-  // TODO - also do code like below for ^^^ tax_term_refs.
-
-  // TODO Possible performance overload chokepoint here. If we run into
-  // whitescreening or timeouts, these should be processed via multiple
-  // batch iterations in their own op.
-
-  foreach ($entityreferences['entities'] as $key => $value) {
-
-    $new_target_id = vsite_backup_get_new_mapping($old_vsite_id, $original_id = $value['target_id']);
-
-// TODO new_target_id lookup not returning anything? are mapped records saved right? problem with lookup?
-//dpm('$new_target_id');
-//dpm($new_target_id);
-
-    // Dynamically load entity type.
-    $entity_load_func = $entityreferences['entities'][$key]['entity_type'] . '_load';
-    $entity = $entity_load_func($value['source_id']);
-
-
-    // TODO now we need the field name....
-    $field_name = $value['field_name'];
-
-
-    // TODO set new field value(s) on entity
-    // [LANGUAGE_NONE][0] ... [N]['target_id']
-    $entity_save_func = $entityreferences['entities'][$key]['entity_type'] . '_save';
-
-    // TODO save entity
-
-  }
-
-// COMMENT OUT TO DEBUG
   // Purge mappings now, success or failure. Using export_id.
   db_query('DELETE FROM {vsite_backup_import_mappings} WHERE export_id = :eid', array(':eid' => $old_vsite_id));
 
@@ -1202,6 +1168,113 @@ function _vsite_import_line_massage_request(&$request, $context, $clone) {
         $request['og_group_ref'][$key]['vid'] = vsite_backup_get_new_mapping($vsite_id = $context['results']['old_vsite_id'], $original_id = $value['vid']);
       }
     }
+  }
+
+}
+
+/**
+ * Internal function to update mappings for all entityreference fields for a
+ * Vsite.
+ *
+ * @param $old_vsite_id
+ * @param $new_vsite_id
+ */
+function _vsite_import_update_entityreferences_mappings($old_vsite_id, $new_vsite_id) {
+
+  // Possible performance overload chokepoint here. If we run into
+  // whitescreening or timeouts, these should be processed via multiple
+  // batch iterations in their own op within batch processing.
+
+  $entityreferences = _vsite_import_get_entityreferences_settings($new_vsite_id);
+
+  foreach ($entityreferences['entities'] as $key => $value) {
+
+    // We've already updated the Organic Groups references, so can skip those.
+    if ($value['field_name'] !== 'og_group_ref') {
+
+      // See if there's a newly mapped value to which we should update this
+      // field.
+      $new_target_id = vsite_backup_get_new_mapping($old_vsite_id, $original_id = $value['target_id']);
+
+      if ($new_target_id) {
+
+        // Dynamically load source entity.
+        $entity_load_func = $entityreferences['entities'][$key]['entity_type'] . '_load';
+        $source_entity = $entity_load_func($value['source_id']);
+
+        $field_name = $value['field_name'];
+
+        // Handle entity field for possibility of multiple deltas when we
+        // patch in the new target ID.
+        foreach ($source_entity->{$field_name}[LANGUAGE_NONE] as $delta => $delta_value) {
+          // Line up with the old value we're replacing, if there are multiple
+          // deltas on this field.
+          // [LANGUAGE_NONE][0 ... N]['target_id']
+          if ($delta_value['target_id'] == $value['target_id']) {
+            $source_entity->{$field_name}[LANGUAGE_NONE]{$delta}['target_id'] = $new_target_id;
+          }
+
+        }
+        $entity_save_func = $entityreferences['entities'][$key]['entity_type'] . '_save';
+        $entity_save_func($source_entity);
+
+      }
+
+    }
+
+  }
+}
+
+/**
+ * Internal function to update mappings for all entityreference fields for a
+ * Vsite.
+ *
+ * @param $old_vsite_id
+ * @param $new_vsite_id
+ */
+function _vsite_import_update_tax_term_refs_mappings($old_vsite_id, $new_vsite_id) {
+
+  // Possible performance overload chokepoint here. If we run into
+  // whitescreening or timeouts, these should be processed via multiple
+  // batch iterations in their own op within batch processing.
+
+  $tax_term_refs = _vsite_import_get_tax_term_refs_settings($new_vsite_id);
+
+  foreach ($tax_term_refs['entities'] as $key => $value) {
+
+    // We've already updated the Organic Groups references, so can skip those.
+    if ($value['field_name'] !== 'og_group_ref') {
+
+      // See if there's a newly mapped value to which we should update this
+      // field.
+      $new_target_id = vsite_backup_get_new_mapping($old_vsite_id, $original_id = $value['target_id']);
+
+      if ($new_target_id) {
+
+        // Dynamically load source entity.
+        $entity_load_func = $tax_term_refs['entities'][$key]['entity_type'] . '_load';
+        $source_entity = $entity_load_func($value['source_id']);
+
+        $field_name = $value['field_name'];
+
+        // Handle entity field for possibility of multiple deltas when we
+        // patch in the new target ID.
+        foreach ($source_entity->{$field_name}[LANGUAGE_NONE] as $delta => $delta_value) {
+          // Line up with the old value we're replacing, if there are multiple
+          // deltas on this field.
+          // [LANGUAGE_NONE][0 ... N]['tid']
+          if ($delta_value['target_id'] == $value['tid']) {
+            $source_entity->{$field_name}[LANGUAGE_NONE]{$delta}['tid'] = $new_target_id;
+          }
+
+        }
+        $entity_save_func = $tax_term_refs['entities'][$key]['entity_type'] . '_save';
+        $entity_save_func($source_entity);
+
+      }
+
+    }
+
   }
 
 }
