@@ -107,6 +107,9 @@ class VsiteExportRestfulSpacesOverrides extends \VsiteExportRestfulSpaces {
         $overrides['type'] = 'og';
         $overrides['id'] = $id;
 
+        // Unserialize, since that happens in drupal_write_record().
+        $overrides['value'] = unserialize($overrides['value']);
+
         drupal_write_record('spaces_overrides', $overrides);
 
       //}
