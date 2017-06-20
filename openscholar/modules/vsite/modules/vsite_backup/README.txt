@@ -22,7 +22,7 @@ DRUPAL MODULES
  - ctools 
  - vsite
  - vsite_menu
- - vsite_export_restful
+ - vsite_backup_restful
  - views
  - file_entity
 
@@ -57,7 +57,7 @@ Contained in this folder:
   - vsite_import
 
 Not included, but required for imports:
-  - vsite_export_restful
+  - vsite_backup_restful
 
 
 PAGES

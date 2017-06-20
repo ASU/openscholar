@@ -1,0 +1,30 @@
+<?php
+
+/**
+ * Implements hook_ctools_plugin_directory().
+ */
+function vsite_backup_restful_ctools_plugin_directory($module, $plugin) {
+  if ($module == 'restful') {
+    return 'plugins/' . $plugin;
+  }
+  if ($module == 'entity_validator') {
+    return 'plugins/' . $plugin;
+  }
+}
+
+
+/*
+Resource class lineages, for quick reference
+
+files -> VsiteBackupRestfulEntityCacheableBase -> RestfulEntityBase
+node -> [*] -> VsiteBackupNodeRestfulBase -> RestfulEntityBaseNode -> RestfulEntityBase
+og_vocab -> RestfulEntityBase
+taxonomy -> VsiteBackupRestfulEntityCacheableBase -> RestfulEntityBase
+user -> RestfulEntityBaseUser -> RestfulEntityBase
+vocabulary -> VsiteBackupRestfulEntityCacheableBase -> RestfulEntityBase
+
+roles -> VsiteBackupRestfulDataProvider -> RestfulDataProviderDbQuery
+spaces_overrides -> VsiteBackupRestfulSpaces -> VsiteBackupRestfulDataProvider -> RestfulDataProviderDbQuery
+vsite_lbv -> VsiteBackupRestfulLayouts -> VsiteBackupRestfulDataProvider -> RestfulDataProviderDbQuery
+
+*/

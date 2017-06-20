@@ -1,0 +1,15 @@
+name = Vsite Backup Restful
+description = Managing integration between OpenScholar and Restful for Vsite Backups
+core = 7.x
+
+dependencies[] = restful
+dependencies[] = restful_token_auth
+
+files[] = plugins/restful/VsiteBackupRestfulEntityCacheableBase.php
+files[] = includes/VsiteBackupNodeRestfulBase.php
+files[] = includes/VsiteBackupObjectValidate.php
+files[] = includes/VsiteBackupRestfulDataProvider.php
+files[] = includes/VsiteBackupRestfulReports.php
+files[] = includes/VsiteBackupRestfulSpaces.php
+files[] = includes/VsiteBackupRestfulLayouts.php
+files[] = includes/VsiteBackupRestfulCPMenu.php
