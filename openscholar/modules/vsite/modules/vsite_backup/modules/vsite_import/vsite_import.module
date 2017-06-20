@@ -139,7 +139,8 @@ function vsite_import_form($form, &$form_state) {
  */
 function vsite_import_form_validate($form, &$form_state) {
 
-  // TODO validate if we're doing a clone, that the new name/purl is available.
+  // TODO validate if we're doing a clone, that the new name/purl is available
+  // for use.
 
   $file = file_save_upload('file', array(
     'file_validate_extensions' => array('tar gz'), // Validate extensions.
@@ -656,13 +657,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
     }
   }
 
-// TODO handling for pathauto, file references, taxonomy term references, user references
-  // pauthauto seems to get set automatically alright... haven't checked manual override values.
-
-  // file refs
-  // Taxonomy term refs
-  // user refs
-
 
   // NODE
   if ($item_type == 'node') {
@@ -673,7 +667,7 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
     foreach ($item as $key => $value) {
 
 
-      // TODO
+      // TODO Done? Has finalize step handling finished this off?
       // ADD to all nodes via classes....
       // field_upload - on lots of nodes
       //
@@ -682,13 +676,11 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       // field_software_package ? in software release
       // media_gallery_file ? media gallery
       //   TODO handling of file fields...
-      // other reference fields? update with maps?
+      // other reference fields? update with mapped values?
 
-
-// TODO in NODES after creation each line... or in finalize?
-//  datestamp and datetime field types
-//  file and image field types
-
+      // TODO in NODES after creating each line... or in finalize?
+      //  datestamp and datetime field types
+      //  file and image field types
 
       // POST method, to create.
       $request = $value[0];
@@ -696,7 +688,6 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
       unset($request['id']);
       unset($request['self']);
-      // TODO eventual handling for these two
       unset($request['og_vocabulary']);
       if (isset($request['field_upload'])) {
         // TODO Do stuff here to record file mapping details for later...
@@ -792,7 +783,7 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   // TAXONOMY, global
   if ($item_type == 'global_org_taxonomy') {
 
-    // TODO Don't want/need to create global org. Anything to do here?
+    // Don't want/need to create global org. Anything to do here?
 
   }
 
@@ -884,7 +875,7 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
   // GLOBAL USER ROLES
   if ($item_type == 'global_user_roles') {
 
-    // TODO We're not importing these... right? Just seems like a bad idea.
+    // We're not importing these. Just seems like a bad idea.
 
   }
 
@@ -1139,7 +1130,6 @@ function vsite_import_finished_callback($success, $results, $operations){
   }
   else {
 
-    //TODO Handle failures here. How?
     $error_operation = reset($operations);
     $message = t('An error occurred while processing %error_operation with arguments: @arguments', array('%error_operation' => $error_operation[0], '@arguments' => print_r($error_operation[1], TRUE)));
     drupal_set_message($message, 'error');

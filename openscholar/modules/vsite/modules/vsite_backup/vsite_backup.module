@@ -659,7 +659,6 @@ function vsite_backup_export_prep_vsite($data) {
 function vsite_backup_export_prep_global_org_taxonomy($data) {
 
   // Get org taxonomy vid via vocabulary resource.
-  // TODO throws notice related to missing gid... do separate resource?
   $resource_name = 'vocabulary';
   $id = $data['item']['vid'];
 
@@ -734,8 +733,6 @@ function vsite_backup_export_prep_file($data) {
 function vsite_backup_export_prep_global_user_roles($data) {
 
   // Do nothing with global roles...
-
-  // TODO maybe export original exportables results as json data?
 
 }
 function vsite_backup_export_prep_group_user_roles($data) {
@@ -886,11 +883,10 @@ function vsite_backup_get_export_prep_mappings() {
 ******************************************************************************/
 
 
-// TODO backup files to be stored as Drupal {file_managed} files... How to secure access?
-
 /*
 
-JSON writes and avoiding memory limits? CSV recommended. Not our requirement here.
+JSON writes and avoiding memory limits? CSV recommended. Not our requirement
+here and there are reasons JSON is disired.
 - https://stackoverflow.com/questions/39927489/php-how-to-append-to-a-json-file
 
 A way to write to existing JSON file. Would require update if structure changed.
@@ -903,7 +899,6 @@ fseek($handle,-1,SEEK_END);
 // json_encode(array(item_type => 'blah', 'item_data' => ....))
 fwrite($handle,$arrayToAdd);
 fclose($handle);
-
 
 
 EXPORT/IMPORT ORDER AND MAPPINGS
@@ -926,6 +921,5 @@ import_vsite_id = id of export(eid)
 item_type = ex. vsite_layout or spaces overrides
 original_item_id
 new_item_id
-
 
  */

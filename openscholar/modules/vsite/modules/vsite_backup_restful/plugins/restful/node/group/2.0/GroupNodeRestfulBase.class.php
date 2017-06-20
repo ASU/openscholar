@@ -120,7 +120,7 @@ class GroupNodeRestfulBase extends VsiteBackupNodeRestfulBase {
     self::cleanRequest($request);
     $wrapper->type->set($request['type']);
 
-//    parent::setPropertyValues($wrapper, $null_missing_fields);
+    //parent::setPropertyValues($wrapper, $null_missing_fields);
     $id = $wrapper->getIdentifier();
 
     if (!$space = vsite_get_vsite($id)) {
@@ -253,7 +253,7 @@ class GroupNodeRestfulBase extends VsiteBackupNodeRestfulBase {
     }
 
     $params['@fields'] = implode(',', $params['@fields']);
-//    $e = new \RestfulBadRequestException(format_plural(count($map), 'Invalid value in field @fields.', 'Invalid values in fields @fields.', $params));
+    //$e = new \RestfulBadRequestException(format_plural(count($map), 'Invalid value in field @fields.', 'Invalid values in fields @fields.', $params));
     foreach ($errors as $property_name => $messages) {
       if (empty($map[$property_name])) {
         // Entity is not valid, but on a field not public.
@@ -267,12 +267,12 @@ class GroupNodeRestfulBase extends VsiteBackupNodeRestfulBase {
         $message['params']['@field'] = $field_name;
         $output = format_string($message['message'], $message['params']);
 
-//        $e->addFieldError($field_name, $output);
+        //$e->addFieldError($field_name, $output);
       }
     }
 
     // Throw the exception.
-//    throw $e;
+    //throw $e;
   }
 
   /**

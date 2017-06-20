@@ -59,7 +59,6 @@ class VsiteBackupRestfulLayoutsOverrides extends \VsiteBackupRestfulLayouts {
     // Set up the blocks layout.
     ctools_include('layout', 'os');
 
-    // TODO layout field/object mapping
     $blocks = os_layout_get($this->object->object_id, FALSE, FALSE, $this->space);
 
     foreach ($blocks as $delta => $block) {

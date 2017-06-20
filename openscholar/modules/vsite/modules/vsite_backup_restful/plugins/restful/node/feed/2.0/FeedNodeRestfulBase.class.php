@@ -53,7 +53,8 @@ class FeedNodeRestfulBase extends VsiteBackupNodeRestfulBase {
     }
 
     /* Comment this out to avoid errors thrown during export process.
-    // TODO Confirm this doesn't have adverse security implications.
+    // TODO Confirm this doesn't have adverse security implications. On initial
+    // consideration, in the context we're working in, it should be okay.
 
     if ($this->checkEntityAccess($op, $entity_type, $entity) === FALSE) {
 

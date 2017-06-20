@@ -360,17 +360,6 @@ function vsite_export_get_vsite_exportables($vsite = NULL, $ordered = TRUE) {
   // Add/remove/alter exportables via hook_vsite_export_exportables_alter().
   drupal_alter('vsite_export_exportables', $exportables);
 
-  // TODO TOKENIZE IDs so referential entities can be re-mapped together at import.
-  // {vsite_backup_mappings}
-  // - entity type
-  // - entity bundle
-  // - entity original id
-  // - New id
-
-// TODO GATHER DURING CRON:
-//URL aliases for nodes, vocabs/terms and users
-
-
   // Order exportables for ideal import sequence.
   if ($ordered) {
     $ordered_exportables = array();
@@ -387,7 +376,6 @@ function vsite_export_get_vsite_exportables($vsite = NULL, $ordered = TRUE) {
 
     return $ordered_exportables;
   }
-
 
   return $exportables;
 }

@@ -1,6 +1,6 @@
 DESCRIPTION
 --------------------------
-Module to add VSite backup/export functions to OpenScholar.
+Module to add VSite export functions to OpenScholar.
 
 
 INSTALLATION
@@ -25,9 +25,6 @@ PERMISSIONS
 CONFIGURATION
 --------------------------
 
-//  - admin/config/vsite_export
-  
-  
 API
 --------------------------
 

@@ -107,6 +107,7 @@ class VsiteBackupRestfulSpacesOverrides extends \VsiteBackupRestfulSpaces {
         $overrides['type'] = 'og';
         $overrides['id'] = $id;
 
+        // IMPORTANT NOTE:
         // Unserialize, since that happens in drupal_write_record().
         $overrides['value'] = unserialize($overrides['value']);
 
