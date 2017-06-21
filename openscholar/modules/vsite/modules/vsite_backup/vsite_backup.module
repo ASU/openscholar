@@ -180,6 +180,10 @@ function vsite_backup_form($form, &$form_state) {
     drupal_set_message(t('A site can not have more than 3 backups at a time and further backups will cause the oldest ones to be deleted. If you would like to save older backups please download them.'), 'status');
   }
 
+  // TEMPORARY NOTICE
+  drupal_set_message(t('Currently, the media gallery, news, presentation and person types are exportable, but they are not yet supported during import and would need to be manually recreated in the case of a site restore or cloning.'));
+
+
   $form['description'] = array(
     '#type' => 'item',
     '#title' => t('Manage site backups'),
@@ -187,10 +191,9 @@ function vsite_backup_form($form, &$form_state) {
 
   $form['export'] = array(
     '#type' => 'submit',
-    '#value' => t('Export'),
+    '#value' => t('Backup'),
     '#submit' => array('vsite_backup_export'),
   );
-       
   return $form;
 }
 
