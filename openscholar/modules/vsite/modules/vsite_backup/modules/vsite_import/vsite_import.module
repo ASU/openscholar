@@ -765,12 +765,20 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
       }
 
-
       // Allow for skipping node types due to support issues not yet addressed.
       if (!$skip_node_type) {
 
         $result = $handler->post('', $request);
         $new_id = $result[0]['id'];
+
+        // Persist newly created nodes
+        if(!is_array($context['results']['new_nodes'])){
+          $context['results']['new_nodes'] = array();
+        }
+        array_push($context['results']['new_nodes'], array(
+          "old" => $old_id,
+          "new" => $new_id
+        ));
 
         // Set group context with the new_vsite_id.
         og_group('node', $context['results']['new_vsite_id'], array('entity_type' => 'node', 'entity' => node_load($new_id)));
@@ -1012,6 +1020,7 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
       // ID.
       foreach ($request as $k1 => $v1) {
         $request[$k1]['id'] = $context['results']['new_vsite_id'];
+        $request[$k1]['value'] = str_replace("node/" . $context['results']['new_nodes'][0]["old"], "node/" . $context['results']['new_nodes'][0]["new"], $request[$k1]['value']);
       }
 
       $request['vsite'] = $context['results']['new_vsite_id'];
