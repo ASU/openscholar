@@ -6,6 +6,14 @@ class BiblioNodeRestfulBase extends VsiteBackupNodeRestfulBase {
     $public_fields = parent::publicFieldsInfo();
 
 
+    // TODO
+    // 1. disable this type, like we do the other disabled types.
+    //    And update wording about it.
+    // 2. during export process, generate export file ala biblio module and
+    //    include it in the tarball.
+    // 3. update to branch for OS...
+
+
     $public_fields['title_field'] = array(
       'property' => 'title_field',
     );
@@ -18,24 +26,24 @@ class BiblioNodeRestfulBase extends VsiteBackupNodeRestfulBase {
     //$public_fields['other_fields'] = array(
     //  'property' => 'other_fields',
     //);
-    $public_fields['biblio_authors_field'] = array(
-      'property' => 'biblio_authors_field',
-    );
-    $public_fields['biblio_secondary_authors_field'] = array(
-      'property' => 'biblio_secondary_authors_field',
-    );
-    $public_fields['biblio_tertiary_authors_field'] = array(
-      'property' => 'biblio_tertiary_authors_field',
-    );
-    $public_fields['biblio_subsidiary_authors_field'] = array(
-      'property' => 'biblio_subsidiary_authors_field',
-    );
-    $public_fields['biblio_corp_authors_field'] = array(
-      'property' => 'biblio_corp_authors_field',
-    );
-    $public_fields['biblio_secondary_title'] = array(
-      'property' => 'biblio_secondary_title',
-    );
+//    $public_fields['biblio_authors_field'] = array(
+//      'property' => 'biblio_authors_field',
+//    );
+//    $public_fields['biblio_secondary_authors_field'] = array(
+//      'property' => 'biblio_secondary_authors_field',
+//    );
+//    $public_fields['biblio_tertiary_authors_field'] = array(
+//      'property' => 'biblio_tertiary_authors_field',
+//    );
+//    $public_fields['biblio_subsidiary_authors_field'] = array(
+//      'property' => 'biblio_subsidiary_authors_field',
+//    );
+//    $public_fields['biblio_corp_authors_field'] = array(
+//      'property' => 'biblio_corp_authors_field',
+//    );
+//    $public_fields['biblio_secondary_title'] = array(
+//      'property' => 'biblio_secondary_title',
+//    );
     $public_fields['biblio_tertiary_title'] = array(
       'property' => 'biblio_tertiary_title',
     );

@@ -765,6 +765,16 @@ function _vsite_import_import_line($filepath, $clone, $line, &$context) {
 
       }
 
+      if ($node_type == 'biblio') {
+
+        drupal_set_message(t("@type node type skipped. Currently not supported. If you have an external publication bibliography, it can be imported through the site's Content admin interface.", array('@type' => $node_type)));
+
+        // TODO support biblio node types.
+        // Note, biblio nodes aren't making it into the export file, unlike
+        // other problem node types.
+        $skip_node_type = TRUE;
+
+      }
 
       // Allow for skipping node types due to support issues not yet addressed.
       if (!$skip_node_type) {
