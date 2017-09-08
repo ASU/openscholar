@@ -49,7 +49,10 @@ function os_restful_init() {
  * Implements hook_entity_property_info_alter().
  */
 function os_restful_entity_property_info_alter(&$info) {
-  $types = array('personal', 'project', 'department');
+  // ASU PATCH START
+  //$types = array('personal', 'project', 'department');
+  $types = array('personal', 'project', 'department', 'lab');
+  // ASU PATCH END
 
   foreach ($types as $type) {
     $info['node']['bundles'][$type]['properties']['preset'] = array(
