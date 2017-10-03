@@ -183,8 +183,8 @@ function vsite_backup_form($form, &$form_state) {
   // TEMPORARY NOTICE
   drupal_set_message(t('Currently, the media gallery, news, presentation and person types are exportable, but they are not yet supported during import and would need to be manually recreated in the case of a site restore or cloning.'));
   if (module_exists('biblio')) {
-    drupal_set_message(t('Back-up and restore of Publications is not yet supported in site back-ups. For now it is not recommended you use this site as the authoritative repository for storing your bibliographic records. If you track publications using an external service you can !import.',
-      array('!import' => l('import publications here', 'cp/os-importer/biblio'))));
+    drupal_set_message(t('Back-up and restore of Publications is not yet supported in site back-ups. Functionality to !export and !import exists separately. If publications are part of your site, please download an export of your citations after using the backup on this page.',
+      array('!export' => l('export', '/publications'), '!import' => l('import', 'cp/os-importer/biblio'))));
   }
 
 
