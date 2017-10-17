@@ -15,6 +15,10 @@
   border-right: 1px solid #666;
 }
 
+#toolbar {
+  z-index: 1600;
+}
+
 #toolbar a.toggle {
   position: absolute;
   right: 30px;
@@ -23,9 +27,9 @@
   overflow: hidden;
   width: 26px;
   height: 25px;
-  z-index: 6;
   top: 0;
   background: url('images/toolbar_toggle.png') no-repeat left top transparent;
+  z-index: 1006;
 }
 
 #toolbar a.toggle:focus,
@@ -51,9 +55,9 @@
 }
 
 .toolbar-drawer #toolbar .toolbar-menu {
-  z-index: 5;
   display: block;
   padding: 0 45px 0 0;
+  z-index: 1005;
 }
 
 .toolbar-drawer #toolbar #toolbar-drawer-anchor {
@@ -83,7 +87,7 @@
 }
 
 #toolbar div.toolbar-drawer {
-  z-index: 4;
+  z-index: 1004;
 }
 
 #toolbar-drawer-slider.active-path {
@@ -149,7 +153,7 @@
   background-position: right center;
   padding-bottom: 6px;
   position: relative;
-  z-index: 1;
+  z-index: 1001;
 }
 
 #toolbar .toolbar-drawer .drawer ul {
@@ -289,7 +293,7 @@
     right: 0;
     top: 0;
     width: auto;
-    z-index: 500;
+    z-index: 1500;
 }
 
 .cp-controls-wrapper a {
