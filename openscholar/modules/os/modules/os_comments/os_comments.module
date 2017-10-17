@@ -163,7 +163,9 @@ function os_comments_comment_save_vsite($comment_node_types) {
 function os_comments_cp_settings() {
   $settings = array();
 
-  $vsite = vsite_get_vsite();
+  if (($vsite = vsite_get_vsite()) === FALSE) {
+    return $settings;
+  }
   $spaces_features = $vsite->controllers->variable->get('spaces_features');
   // Blog settings link won't appear in CP menu if blog app is not enabled.
   if (!$spaces_features['os_blog']) {
