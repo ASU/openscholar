@@ -1,0 +1,14 @@
+diff --git a/boxes.module b/boxes.module
+index 3952dc58..09f2d138 100644
+--- a/boxes.module
++++ b/boxes.module
+@@ -394,7 +394,8 @@ function boxes_box_load($delta = NULL) {
+       if (is_array($space_box)) {
+         $space_box = (object)$space_box;
+       }
+-      $box = boxes_factory($space_box->plugin_key, $space_box);
++     $box = boxes_factory($space_box->plugin_key, $space_box);
++#      $box = boxes_factory($space_box->plugin_key, $space_box) ?: new StdClass();
+       $box->new = FALSE;
+ 
+       if ($box instanceof boxes_box) {
