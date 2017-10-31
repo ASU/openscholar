@@ -1,0 +1,29 @@
+diff --git a/js/asu-scholar.js b/js/asu-scholar.js
+index 6583e4df..55541f26 100644
+--- a/js/asu-scholar.js
++++ b/js/asu-scholar.js
+@@ -160,14 +160,18 @@ var asu_os_menu = (function asu_os_menu() {
+                   navOffset = navOffset - jQuery('#navbar-tray').height();
+               }
+           }
+-          if ((jQuery('.asu-global.asu-global--outer').offset().top - (jQuery(window).scrollTop() + navOffset)) < 1 && jQuery('.ghostSlider').length < 1) {
+-              jQuery('.asu-global.asu-global--outer').clone(true).prependTo(document.body).addClass('ghostSlider')
++          var original = jQuery('.asu-global.asu-global--outer');
++          if ((original.offset().top - (jQuery(window).scrollTop() + navOffset)) < 1 && jQuery('.ghostSlider').length < 1) {
++              original.clone(true).prependTo(document.body).addClass('ghostSlider')
+                   .css({"position": "fixed", "z-index": "1000", "width": "100%", "visibility": "visible"})
+                   .removeClass('asu-global asu-global--outer');
+-          } else if ((jQuery('.asu-global.asu-global--outer').offset().top - (jQuery(window).scrollTop() + navOffset)) >= 1) {
++              original.css('visibility', 'hidden').find('ul').attr('visibility', 'visible').css('visibility', 'hidden');
++          }
++          else if ((original.offset().top - (jQuery(window).scrollTop() + navOffset)) >= 1) {
+               jQuery('.ghostSlider').remove();
++              original.css('visibility', 'visible').find('ul').attr('visibility', 'hidden').css('visibility', 'visible');
+           }
+       });
+     }
+-  }
+-})();
+\ No newline at end of file
++  };
++})();
