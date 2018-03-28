@@ -179,7 +179,7 @@ function _os_restful_store_props($key, $value = null) {
     $stored[$key] = $value;
   }
 
-  return $stored[$key];
+  return isset($stored[$key]) ? $stored[$key] : NULL;
 }
 
 function os_restful_restful_parse_request_alter(&$request) {
@@ -188,8 +188,9 @@ function os_restful_restful_parse_request_alter(&$request) {
   }
 
   if (!empty($request['vsite'])) {    // find way to get vsite when it's not explicitly given
-    $vsite = vsite_get_vsite($request['vsite']);
-    $vsite->activate_user_roles();
+    if ($vsite = vsite_get_vsite($request['vsite'])) {
+      $vsite->activate_user_roles();
+    }
   }
 
   if (!empty($request['file'])) {

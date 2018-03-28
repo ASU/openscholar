@@ -33,6 +33,7 @@ body.overlay {
     transition-timing-function: ease-in-out;
     transition-delay: .125s;
 }
+#branding,
 .page-cp #branding {
     position: relative;
     margin-left: 110px;
@@ -91,10 +92,29 @@ body.overlay {
 #cssmenu ul li span {
     line-height: 1;
 }
-#cssmenu {
+#cssmenu *,
+.user-menu * {
     font-family: helvetica;
     color: #ffffff;
+    font-weight:normal;
 }
+.user-menu .clearable,
+.user-menu .no-search-result {
+    color:#444;
+}
+.user-menu .pager {
+  
+    color: #333;
+   
+}
+.user-menu .pager button {
+  
+   border:none;
+   background-color:#fff;
+  font-size:1.6em;
+   
+}
+
 #cssmenu ul {
     z-index: 2;
     position: relative;
@@ -227,6 +247,7 @@ body.overlay {
     display: block;
     width: 100%;
 }
+.user-menu .pager button,
 .topRight_subMenu li a.text_link {
     color: #215990;
 }
@@ -299,7 +320,7 @@ a {
     position: absolute;
     right: 152px;
     background-color: #FFF;
-    width: 350px;
+    width: 380px;
     color: #1e1e1e;
     border: 1px solid #CCC;
     -webkit-box-shadow: 3px 3px 3px 0px rgba(50, 50, 50, 0.3);
@@ -368,11 +389,11 @@ td.user-site-controls {
     color: #215990;
 }
 .btton {
-    border-radius: 3px 3px 3px 3px;
-    -moz-border-radius: 3px 3px 3px 3px;
-    -webkit-border-radius: 3px 3px 3px 3px;
+    border-radius: 2px 2px 2px 2px;
+    -moz-border-radius: 2px 2px 2px 2px;
+    -webkit-border-radius: 2px 2px 2px 2px;
     color: #FFF;
-    padding: 3px 4px;
+    padding: 4px 5px;
 }
 .btton.add {
     background-color: #458C00;

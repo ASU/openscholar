@@ -2,7 +2,7 @@
   var rootPath,
     open = angular.noop;
 
-  angular.module('mediaBrowser', ['JSPager', 'EntityService', 'os-auth', 'ngSanitize', 'angularFileUpload', 'angularModalService', 'FileEditor', 'mediaBrowser.filters', 'locationFix'])
+  angular.module('mediaBrowser', ['JSPager', 'EntityService', 'os-auth', 'ngSanitize', 'angularFileUpload', 'angularModalService', 'FileEditor', 'mediaBrowser.filters', 'locationFix', 'angularSlideables'])
     .config(function (){
        rootPath = Drupal.settings.paths.moduleRoot;
     })
@@ -61,8 +61,8 @@
         }
       }
     }])
-  .controller('BrowserCtrl', ['$scope', '$filter', '$http', 'EntityService', 'EntityConfig', '$sce', '$q', '$upload', '$timeout', 'FILEEDITOR_RESPONSES', 'params', 'close',
-      function ($scope, $filter, $http, EntityService, config, $sce, $q, $upload, $timeout, FER, params, close) {
+  .controller('BrowserCtrl', ['$scope', '$filter', '$http', 'EntityService', 'EntityConfig', '$sce', '$q', '$upload', '$timeout', 'FILEEDITOR_RESPONSES', 'params', 'close', '$location',
+      function ($scope, $filter, $http, EntityService, config, $sce, $q, $upload, $timeout, FER, params, close, $location) {
 
     // Initialization
     var service = new EntityService('files', 'id'),
@@ -123,11 +123,13 @@
         var ext = Drupal.settings.extensionMap[types[t]],
           i = 0, l = ext ? ext.length : false;
 
-        if (!ext) continue;
-
-        for (var i=0; i<l; i++) {
-          if ($scope.extensions.indexOf(ext[i]) === -1) {
-            $scope.extensions.push(ext[i]);
+        if (!ext) {
+          $scope.extensions.push(types[t]);
+        } else {
+          for (var i=0; i<l; i++) {
+            if ($scope.extensions.indexOf(ext[i]) === -1) {
+              $scope.extensions.push(ext[i]);
+            }
           }
         }
       }
@@ -629,10 +631,17 @@
         }
       })
       .error(function (e) {
-        $scope.embedFailure = true;
+        if ($location.protocol() == 'https') {
+          $scope.embedFailureHttps = true;
+          $timeout(function () {
+            $scope.embedFailureHttps = false;
+          }, 5000);
+        } else {
+          $scope.embedFailure = true;
           $timeout(function () {
             $scope.embedFailure = false;
           }, 5000);
+        }
       });
     }
 

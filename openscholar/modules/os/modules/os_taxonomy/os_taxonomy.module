@@ -842,17 +842,6 @@ function os_taxonomy_select_list($form, $form_state, $terms_list, $path) {
     $form['terms_' . $form['#vocabulary']->vid]['#default_value'] = url($_GET['q'], array('absolute' => TRUE));
   }
 
-  $form['actions'] = array(
-    '#type' => 'actions',
-    'submit' => array(
-      '#attributes' => array(
-        'class' => array('os-taxonomy-select-submit'),
-      ),
-      '#type' => 'submit',
-      '#value' => t('Go'),
-    ),
-  );
-
   return $form;
 }
 
@@ -1029,13 +1018,8 @@ function theme_os_taxonomy_tagged_nodes($variables) {
   $tagged_item_per_page = variable_get('os_taxonomy_items_per_page', 15);
   $page = !isset($_GET['page']) ? 0 : $_GET['page'];
 
-  // Show description only if set and if this is first page.
-  $show_descriptioon = FALSE;
-  if ($variables['taxonomy_term']) {
-    if (!$page && array_key_exists(LANGUAGE_NONE, $variables['taxonomy_term']->show_description) && $variables['taxonomy_term']->show_description[LANGUAGE_NONE][0]['value']) {
-      $show_descriptioon = TRUE;
-    }
-  }
+  // Show description only this is first page.
+  $show_descriptioon = !$page;
 
   $options = $variables['options'] + array(
     'range' => $tagged_item_per_page,
@@ -1387,7 +1371,7 @@ function os_taxonomy_list_attached_entities($tid, $bundles = array(), $range = N
 
   // Order by weight only if "nodeorder" is on and order has been set.
   if (module_exists('nodeorder') && _os_taxonomy_noderoder_exists($tid)) {
-    $query->leftJoin('taxonomy_index', 't', '(ogv.entity_type = :node_order_type AND ogv.entity_id = t.nid)', array(':node_order_type' => 'node'));
+    $query->leftJoin('taxonomy_index', 't', '(ogv.entity_type = :node_order_type AND ogv.entity_id = t.nid AND t.tid = ogv.og_vocabulary_target_id)', array(':node_order_type' => 'node'));
     $query->orderBy('t.weight', 'ASC');
   }
   else {
@@ -1872,11 +1856,6 @@ function os_taxonomy_form_taxonomy_form_term_alter(&$form, &$form_state, $form_i
     }
   }
 
-  // Set the default value for "show description" to TRUE for new terms.
-  if (is_array($form['#term']) && !$form['#term']['tid']) {
-    $form['show_description']['und']['#default_value'] = TRUE;
-  }
-
   if (!empty($form['#attributes']['class']) && in_array('confirmation', $form['#attributes']['class'])) {
     $form['description']['#markup'] = t('Deleting a term  <span class="emphasize">will delete all of its child terms</span> if there are any. Reassigning child terms to a different parent term should be considered. This action cannot be undone.');
   }
@@ -1885,11 +1864,72 @@ function os_taxonomy_form_taxonomy_form_term_alter(&$form, &$form_state, $form_i
   $form['#attached']['js'][] = drupal_get_path('module', 'os_wysiwyg') . '/js/wrap_plugins.js';
   $form['#attached']['js'][] = drupal_get_path('module', 'os_common') . '/modules/standard-form.js';
   $form['#attached']['js'][] = array(
-    'data' => '//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML',
+    'data' => '//cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML',
     'type' => 'external',
   );
   $form['#attached']['library'][] = array('media', 'media_browser');
   $form['#attached']['library'][] = array('os_common', 'FileEditorModal');
+
+  unset($form['relations']['weight']);
+  $form['relations']['parent']['#options'][0] = "Keep at top";
+  $form['relations']['parent']['#multiple'] = false;
+  $form['relations']['parent']['#description'] = "Place the term in the name field under an existing term in the dropdown.";
+
+  $form['parent'] = $form['relations']['parent'];
+  unset($form['relations']);
+
+  if ($form_state['values']['op'] == 'Delete') {
+    $form['actions']['cancel']['#type'] = 'submit';
+    $form['actions']['cancel']['#value'] = 'Cancel';
+  }
+
+  $form['#validate'][] = '_os_taxonomy_validate_unicode_charset';
+  $form['#submit'][] = '_os_taxonomy_operations';
+  $form['actions']['cancel']['#submit'][] = '_os_taxonomy_custom_form_cancel';
+}
+
+/**
+ * Callback after saving form to close overlay.
+ */
+function _os_taxonomy_operations(&$form, &$form_state) {
+  //Get the parent vocabulary name for redirect after delete operation.
+  $vocab = $form['vocabulary_machine_name']['#value'];
+  $path = 'cp/build/taxonomy/' . $vocab;
+
+  // Form API will re-render the current page and pass the redirect information to the overlay JavaScript.
+  if (($form_state['values']['op'] == 'Save') && $form['#term']['tid']) {
+    overlay_close_dialog();
+    $form_state['redirect'] = FALSE;
+  }
+
+  //Redirection after term delete.
+  if ($form_state['values']['op'] == 'Delete') {
+    $form_state['redirect'] = url($path);
+  }
+}
+
+/**
+ * Callback for custom cancel redirection.
+ */
+function _os_taxonomy_custom_form_cancel(&$form, &$form_state) {
+  //Get the term ID.
+  $tid = $form['#term']->tid;
+  $path_term = 'taxonomy/term/' . $tid;
+  //Redirection to the term page after cancellation.
+  $form_state['redirect'] = url($path_term);
+}
+
+/**
+ * Callback for custom validation.
+ */
+function _os_taxonomy_validate_unicode_charset(&$form, &$form_state) {
+  $termName = $form_state['values']['name'];
+  $exp = '/^[\x{0000}-\x{FFFF}]+$/u';
+
+  if (!preg_match($exp,$termName)) {
+    form_set_error('name', t("Sorry, the character you entered is not supported."));
+    return $form;
+  }
 }
 
 /**
@@ -1969,68 +2009,6 @@ function os_taxonomy_field_attach_create_bundle($entity_type, $bundle) {
       }
     }
   }
-  if ($entity_type != 'taxonomy_term') {
-    return;
-  }
-  os_taxonomy_attach_fields_to_vocabulary('taxonomy_term', $bundle);
-}
-
-/**
- * Adds "show description" field to vocabulary.
- *
- * @param $entity_type
- *   The entity type of the bundle we want to attach the field to
- * @param $bundle
- *   The bundle to attach the fields to.
- * @throws FieldException
- *
- * @see field_create_instance().
- */
-function os_taxonomy_attach_fields_to_vocabulary($entity_type, $bundle) {
-  $info = os_taxonomy_og_fields_info();
-  $field = $info['show_description']['field'];
-
-  if (!field_info_field($field['field_name'])) {
-    field_create_field($field);
-  }
-
-  $instance = $info['show_description']['instance'];
-
-  $instance += array(
-    'field_name' => $field['field_name'],
-    'bundle' => $bundle,
-    'entity_type' => $entity_type,
-  );
-
-  // Implement the field_create_instance() function.
-  $field = field_read_field($instance['field_name']);
-  if (empty($field)) {
-    throw new FieldException(t("Attempt to create an instance of a field @field_name that doesn't exist or is currently inactive.", array('@field_name' => $instance['field_name'])));
-  }
-  // Check that the required properties exists.
-  if (empty($instance['entity_type'])) {
-    throw new FieldException(t('Attempt to create an instance of field @field_name without an entity type.', array('@field_name' => $instance['field_name'])));
-  }
-  if (empty($instance['bundle'])) {
-    throw new FieldException(t('Attempt to create an instance of field @field_name without a bundle.', array('@field_name' => $instance['field_name'])));
-  }
-  // Check that the field can be attached to this entity type.
-  if (!empty($field['entity_types']) && !in_array($instance['entity_type'], $field['entity_types'])) {
-    throw new FieldException(t('Attempt to create an instance of field @field_name on forbidden entity type @entity_type.', array('@field_name' => $instance['field_name'], '@entity_type' => $instance['entity_type'])));
-  }
-
-  $instance['field_id'] = $field['id'];
-
-  $prior_instance = field_read_instance($instance['entity_type'], $instance['field_name'], $instance['bundle']);
-  if (!empty($prior_instance)) {
-    $message = t('Attempt to create an instance of field @field_name on bundle @bundle that already has an instance of that field.', array('@field_name' => $instance['field_name'], '@bundle' => $instance['bundle']));
-    throw new FieldException($message);
-  }
-
-  // Writing the field the to DB and clear the cache field. This part meant for
-  // performance.
-  _field_write_instance($instance);
-  field_cache_clear();
 }
 
 /**
@@ -2044,72 +2022,6 @@ function os_taxonomy_form_taxonomy_overview_terms_alter(&$form, &$form_state) {
   // Change the cancel link destination from the reset to alphabetical form to
   // path in the current vsite.
   $form['actions']['cancel']['#href'] = 'cp/build/taxonomy/' . $form['machine_name']['#value'];
-}
-
-/**
- * Implements hook_og_fields_info().
- */
-function os_taxonomy_og_fields_info() {
-
-  $items['show_description'] = array(
-    'type' => array('group content'),
-    'description' => t('Show taxonomy term description.'),
-    'entity' => array('taxonomy_term'),
-    'field' => array(
-      'active' => 1,
-      'cardinality' => 1,
-      'deleted' => 0,
-      'entity_types' => array('taxonomy_term'),
-      'field_name' => 'show_description',
-      'foreign keys' => array(),
-      'indexes' => array(
-        'value' => array(
-          0 => 'value',
-        ),
-      ),
-      'locked' => 0,
-      'module' => 'list',
-      'settings' => array('allowed_values' => array(0 => '', 1 => '',),'allowed_values_function' => '',),
-      'translatable' => 0,
-      'type' => 'list_boolean',
-    ),
-    'instance' => array(
-      'default_value' => array(
-        0 => array(
-          'value' => 0,
-        ),
-      ),
-      'deleted' => 0,
-      'description' => 'Define whether the term description will be seen in the term page.',
-      'display' => array(
-        'default' => array(
-          'label' => 'hidden',
-          'module' => 'list',
-          'settings' => array(),
-          'type' => 'hidden',
-          'weight' => 0,
-        ),
-      ),
-      'entity_type' => 'taxonomy_term',
-      'field_name' => 'show_description',
-      'label' => 'Show description',
-      'required' => 0,
-      'settings' => array(
-        'user_register_form' => FALSE,
-      ),
-      'widget' => array(
-        'active' => 1,
-        'module' => 'options',
-        'settings' => array(
-          'display_label' => 1,
-        ),
-        'type' => 'options_onoff',
-        'weight' => 2,
-      ),
-    ),
-  );
-
-  return $items;
 }
 
 /**
@@ -2138,4 +2050,115 @@ function os_taxonomy_node_view_alter(&$build) {
   if (!variable_get('os_taxonomy_display_term_under_content_' . $build['#node']->type, 0) && $build['#view_mode'] == 'teaser') {
     unset($build['og_vocabulary']);
   }
+}
+
+/**
+ * Implements hook_theme_registry_alter().
+ *
+ * @see theme_os_taxonomy_taxonomy_overview_terms()
+ */
+function os_taxonomy_theme_registry_alter(&$theme_registry) {
+  $theme_registry['taxonomy_overview_terms']['function'] = 'theme_os_taxonomy_taxonomy_overview_terms';
+}
+
+/**
+ * Override theme_taxonomy_overview_terms() to remove weight from table for single row.
+ *
+ * @param $variables
+ *   An associative array containing:
+ *   - form: A render element representing the form.
+ *
+ * @see theme_taxonomy_overview_terms()
+ */
+function theme_os_taxonomy_taxonomy_overview_terms($variables) {
+  $form = $variables['form'];
+
+  $page_increment  = $form['#page_increment'];
+  $page_entries    = $form['#page_entries'];
+  $back_step     = $form['#back_step'];
+  $forward_step  = $form['#forward_step'];
+
+  // Add drag and drop if parent fields are present in the form.
+  if ($form['#parent_fields']) {
+    drupal_add_tabledrag('taxonomy', 'match', 'parent', 'term-parent', 'term-parent', 'term-id', FALSE);
+    drupal_add_tabledrag('taxonomy', 'depth', 'group', 'term-depth', NULL, NULL, FALSE);
+    drupal_add_js(drupal_get_path('module', 'taxonomy') . '/taxonomy.js');
+    drupal_add_js(array('taxonomy' => array('backStep' => $back_step, 'forwardStep' => $forward_step)), 'setting');
+    drupal_add_css(drupal_get_path('module', 'taxonomy') . '/taxonomy.css');
+  }
+  drupal_add_tabledrag('taxonomy', 'order', 'sibling', 'term-weight');
+
+  $errors = form_get_errors() != FALSE ? form_get_errors() : array();
+  $rows = array();
+  foreach (element_children($form) as $key) {
+    if (isset($form[$key]['#term'])) {
+      $term = &$form[$key];
+
+      $row = array();
+      $row[] = (isset($term['#term']['depth']) && $term['#term']['depth'] > 0 ? theme('indentation', array('size' => $term['#term']['depth'])) : ''). drupal_render($term['view']);
+      if ($form['#parent_fields']) {
+        $term['tid']['#attributes']['class'] = array('term-id');
+        $term['parent']['#attributes']['class'] = array('term-parent');
+        $term['depth']['#attributes']['class'] = array('term-depth');
+        $row[0] .= drupal_render($term['parent']) . drupal_render($term['tid']) . drupal_render($term['depth']);
+      }
+      $term['weight']['#attributes']['class'] = array('term-weight');
+      // Removing the weight for single row entry
+      if (isset($form['actions'])) {
+        $row[] = drupal_render($term['weight']);
+      }
+      $row[] = drupal_render($term['edit']);
+      $row = array('data' => $row);
+      $rows[$key] = $row;
+    }
+  }
+
+  // Add necessary classes to rows.
+  $row_position = 0;
+  foreach ($rows as $key => $row) {
+    $rows[$key]['class'] = array();
+    if (isset($form['#parent_fields'])) {
+      $rows[$key]['class'][] = 'draggable';
+    }
+
+    // Add classes that mark which terms belong to previous and next pages.
+    if ($row_position < $back_step || $row_position >= $page_entries - $forward_step) {
+      $rows[$key]['class'][] = 'taxonomy-term-preview';
+    }
+
+    if ($row_position !== 0 && $row_position !== count($rows) - 1) {
+      if ($row_position == $back_step - 1 || $row_position == $page_entries - $forward_step - 1) {
+        $rows[$key]['class'][] = 'taxonomy-term-divider-top';
+      }
+      elseif ($row_position == $back_step || $row_position == $page_entries - $forward_step) {
+        $rows[$key]['class'][] = 'taxonomy-term-divider-bottom';
+      }
+    }
+
+    // Add an error class if this row contains a form error.
+    foreach ($errors as $error_key => $error) {
+      if (strpos($error_key, $key) === 0) {
+        $rows[$key]['class'][] = 'error';
+      }
+    }
+    $row_position++;
+  }
+
+  if (empty($rows)) {
+    $rows[] = array(array('data' => $form['#empty_text'], 'colspan' => '3'));
+  }
+
+  $header = array(t('Name'));
+
+  // Not displaying weight in header if there is only one row
+  if (isset($form['actions'])) {
+    $header[] = t('Weight');
+  }
+  $header[] = t('Operations');
+  // $header = array(t('Name'), t('Weight'), t('Operations'));
+  $output = theme('table', array('header' => $header, 'rows' => $rows, 'attributes' => array('id' => 'taxonomy')));
+  $output .= drupal_render_children($form);
+  $output .= theme('pager');
+
+  return $output;
 }

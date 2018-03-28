@@ -16,7 +16,6 @@ function vsite_cp_settings() {
 
   // Builds the "Site favicon" file field widget.
   // Renders a fieldset with a managed file widget.
-
   $subsite_parents = variable_get('subsite_parents', array('department', 'project'));
   $inherit_theme = variable_get('vsite_subsite_inherit_theme', 0);
   if (in_array($vsite->group->type, $subsite_parents)) {
@@ -32,7 +31,7 @@ function vsite_cp_settings() {
         '#title' => t('Subsite Themes'),
         '#weight' => 31,
         '#menu_parent' => 'appearance',
-        '#help_link' => l(t('Learn more about subsite themes'), 'http://docs.openscholar.harvard.edu/subsite-themes', array('attributes' => array('target' => '_blank')))
+        '#help_link' => l(t('Learn more about subsite themes'), 'https://help.theopenscholar.com/subsite-themes', array('attributes' => array('target' => '_blank')))
       ),
     );
   }
@@ -49,7 +48,7 @@ function vsite_cp_settings() {
       '#id' => 'vsite-seo',
       '#title' => t('Search Engine Optimization (SEO)'),
       '#weight' => 30,
-      '#help_link' => l(t('Learn more about Search Engine Optimization'), 'http://docs.openscholar.harvard.edu/global-site-settings#search-engine-optimization', array('attributes' => array('target' => '_blank')))
+      '#help_link' => l(t('Learn more about Search Engine Optimization'), 'https://help.theopenscholar.com/global-site-settings#search-engine-optimization', array('attributes' => array('target' => '_blank')))
     ),
     'rest_submit' => 'vsite_rest_cp_settings_submit',
     'submit' => 'vsite_cp_settings_form_submit'
@@ -73,7 +72,7 @@ function vsite_cp_settings() {
       '#id' => 'vsite-seo',
       '#title' => t('Search Engine Optimization (SEO)'),
       '#weight' => 30,
-      '#help_link' => l(t('Learn more about Search Engine Optimization'), 'http://docs.openscholar.harvard.edu/global-site-settings#search-engine-optimization', array('attributes' => array('target' => '_blank')))
+      '#help_link' => l(t('Learn more about Search Engine Optimization'), 'https://help.theopenscholar.com/global-site-settings#search-engine-optimization', array('attributes' => array('target' => '_blank')))
     ),
     'rest_submit' => 'vsite_rest_cp_settings_submit',
     'submit' => 'vsite_cp_settings_form_submit'
@@ -87,18 +86,18 @@ function vsite_cp_settings() {
       '#custom_directive_parameters' => array(
         'cardinality' => 1,
         'panes' => array('upload', 'library'),
+        'hide_helpicon' => true,
         'droppable_text' => t('Drag your file here'),
         'upload_text' => t('Upload file'),
         'max-filesize' => '100kb',
-        'extensions' => array('ico'),
-        'types' => array('icon'),
+        'types' => array('png'),
       ),
       '#title' => t('Favicon'),
-      '#description' => t('A 16x16 .ico file to be displayed in browser shortcut icons and tabs for any page on your site. For help generating a favicon file, try <a href="http://www.favicon.cc/" target="_blank">http://www.favicon.cc/</a>.'),
+      '#description' => t('A 16x16 .png file to be displayed in browser shortcut icons and tabs for any page on your site. For help generating a favicon file, try <a href="http://www.favicon.cc/" target="_blank">http://www.favicon.cc/</a>.'),
       '#default_value' => variable_get('site_favicon_fid', ''),
       '#upload_location' => $purl ? "public://{$purl}/files" : "public://",
       '#upload_validators' => array(
-        'file_validate_extensions' => array('ico'),
+        'file_validate_extensions' => array('png'),
         'file_validate_size' => array(2*1024*1024),
       ),
     ),
@@ -108,7 +107,7 @@ function vsite_cp_settings() {
       '#weight' => 30,
       '#menu_parent' => 'appearance',
       '#description' => t('A favicon is a 16x16 .ico file to be displayed in browser shortcut iocns and tabs for any page on your site. For help generatiing a favison, try <a href="http://www.favicon.cc/">http://www.favicon.cc/</a>.'),
-      '#help_link' => l(t('Learn more about favicon'), 'http://docs.openscholar.harvard.edu/adding-site-favicon', array('attributes' => array('target' => '_blank')))
+      '#help_link' => l(t('Learn more about favicon'), 'https://help.theopenscholar.com/adding-site-favicon', array('attributes' => array('target' => '_blank')))
     ),
     'submit' => 'vsite_cp_settings_form_submit',
   );
@@ -125,7 +124,7 @@ function vsite_cp_settings() {
       '#id' => 'vsite-seo',
       '#title' => t('Search Engine Optimization (SEO)'),
       '#weight' => 30,
-      '#help_link' => l(t('Learn more about Search Engine Optimization'), 'http://docs.openscholar.harvard.edu/global-site-settings#search-engine-optimization', array('attributes' => array('target' => '_blank')))
+      '#help_link' => l(t('Learn more about Search Engine Optimization'), 'https://help.theopenscholar.com/global-site-settings#search-engine-optimization', array('attributes' => array('target' => '_blank')))
     ),
     'submit' => 'vsite_cp_settings_form_submit'
   );
@@ -143,7 +142,7 @@ function vsite_cp_settings() {
       '#id' => 'vsite-seo',
       '#title' => t('Search Engine Optimization (SEO)'),
       '#weight' => 30,
-      '#help_link' => l(t('Learn more about Search Engine Optimization'), 'http://docs.openscholar.harvard.edu/global-site-settings#search-engine-optimization', array('attributes' => array('target' => '_blank')))
+      '#help_link' => l(t('Learn more about Search Engine Optimization'), 'https://help.theopenscholar.com/global-site-settings#search-engine-optimization', array('attributes' => array('target' => '_blank')))
     ),
     'submit' => 'vsite_cp_settings_form_submit',
   );

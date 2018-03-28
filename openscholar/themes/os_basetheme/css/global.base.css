@@ -4,7 +4,7 @@
  */
 /*
  * Fonts
- *
+ ***
  * By default there is no global font size reset. A common
  * method is to reset it to 62.5%, or 10px. This makes it very
  * easy to calculate the required font sizes in em, for example:
@@ -177,6 +177,12 @@ h3 a,
 h4 a {
     text-decoration: none;
 }
+#content-column .field-name-body h2,
+#content-column .field-name-body h3,
+#content-column .field-name-body h4 {
+    line-height: 1.2em;
+}
+
 .profile h3 {
     border-bottom: none;
 }
@@ -245,9 +251,8 @@ a img {
     display: inline;
 }
 img.file-icon {
-    width:16px;
+    width: 16px;
 }
-	
 .block-boxes-os_sv_list_file .file-info iframe {
     display: block;
 }
@@ -280,7 +285,7 @@ img.file-icon {
 .content-left.content-right.content-bottom .region-content-first .sv-list-video.sv-list-view-teaser .file-info,
 .content-left.content-right.content-bottom .region-content-second .sv-list-video.sv-list-view-teaser .file-info,
 .content-left.content-right.content-bottom .region-content-bottom .sv-list-video.sv-list-view-teaser .file-info,
-.sidebar .sv-list-video.sv-list-view-teaser .file-info,
+.sidebar .sv-list-video.sv-list-view-teaser .file-video,
 #content-column .sv-list-video.sv-list-view-teaser img,
 #content-column .sv-list-image.sv-list-view-teaser .file-image img {
     margin-bottom: 20px;
@@ -364,8 +369,9 @@ p {
 #columns p:last-child {
     margin: 0 0px .4em;
 }
+#content-column .block-boxes-os_boxes_columns .sv-list-video.sv-list-view-teaser img, 
 span.os-cvlinkwrap {
-	margin-bottom:0;
+    margin-bottom: 0;
 }
 a,
 a:visited {
@@ -459,9 +465,82 @@ ol {
     margin: 0 0 1.5em 17px;
     padding: 0;
 }
-.field-name-body ol {
+/*.field-name-body ol {
     margin: 0 0 1.5em 21px;
 }
+*/
+.field-name-body ol ul,
+.field-name-body ul {
+  display: table;
+  margin-left: 0;
+  padding-left: 0;
+  list-style: none;
+  counter-reset: table-ul;
+ }
+
+ .field-name-body ul li {
+    display: table-row;
+    counter-increment: table-ul;
+}
+
+ .field-name-body ul li:before {
+      content: counter(table-ul) ".";
+      display: table-cell;
+      padding-right: 0.4em;
+      text-align: right;
+}
+
+.field-name-body ol ol ul li:before,
+.field-name-body ol ul li:before,
+.field-name-body ul li:before {
+    content: counter(table-ul,disc);
+}
+
+.field-name-body ol ol ul ul li:before,
+.field-name-body ol ul ul li:before,
+.field-name-body ul ul li:before {
+    content: counter(table-ul,circle);
+}
+
+.field-name-body ol ol ul ul ul li:before,
+.field-name-body ol ul ul ul li:before,
+.field-name-body ul ul ul li:before {
+    content: counter(table-ul,square);
+}
+
+.field-name-body ol ul,
+.field-name-body ol {
+  display: table;
+  margin-left: 0;
+  padding-left: 0;
+  list-style: none;
+  counter-reset: table-ol;
+ }
+
+ .field-name-body ol li {
+    display: table-row;
+    counter-increment: table-ol;
+}
+
+ .field-name-body ol li:before {
+      content: counter(table-ol) ".";
+      display: table-cell;
+      padding-right: 0.4em;
+      text-align: right;
+}
+
+
+
+ .field-name-body ol ol li:before {
+       content: counter(table-ol, upper-alpha) ".";
+     
+}
+
+ .field-name-body ol ol ol li:before {
+       content: counter(table-ol, lower-alpha) ".";
+     
+}
+
 .item-list ul,
 .item-list ol {
     margin: 0;
@@ -475,7 +554,6 @@ ol {
     margin: 0;
     padding: 0;
 }
-
 .block ul {
     padding-left: 0;
     list-style: none;
@@ -499,11 +577,6 @@ ol ul,
     margin-bottom: 0;
 }
 
-
-.item-list .field-name-body ul,
-.item-list .field-name-body ol {
-	margin: 0 0 1.5em 17px;
-}
 /** 1 A a (1) **/
 
 .mceContentBody ol,
@@ -513,7 +586,6 @@ ol ul,
 .mceContentBody ol ol,
 #content-column ol ol {
     list-style-type: upper-alpha;
-    margin-left: 25px;
 }
 .mceContentBody ol ol ol,
 #content-column ol ol ol {
@@ -570,7 +642,7 @@ ul ul ul ul {
     margin-bottom: 15px;
 }
 .sidebar .block-boxes-os_boxes_facetapi_vocabulary.collapsible .item-list,
-.sidebar .block-boxes-os_boxes_facetapi_vocabulary .item-list:last-chld {
+.sidebar .block-boxes-os_boxes_facetapi_vocabulary .item-list:last-child {
     margin-bottom: 0;
 }
 .boxes-box ul.featured-links {
@@ -583,9 +655,9 @@ ul ul ul ul {
 .boxes-box ul.featured-links .field-name-body li {
     margin-bottom: 0;
 }
-.boxes-box ul.featured-links.title-only li h1.node-title a{
- font-size: 1em !important;
- font-weight: normal !important;
+.boxes-box ul.featured-links.title-only li h1.node-title a {
+    font-size: 1em !important;
+    font-weight: normal !important;
 }
 /* CALENDAR - UPCOMING LI'S */
 
@@ -626,12 +698,8 @@ ul ul ul ul {
     position: relative;
 }
 .cal-export {
-    padding: 5px 25px 5px 5px;
-    border: 1px solid #e4e4e4;
-    border-radius: 4px;
-    -moz-border-radius: 4px;
-    -webkit-border-radius: 4px;
-    background: url('../images/scholarbase-sprite.png?abf') no-repeat 57px -958px #f3f3f1;
+    padding: 0 25px 0 0;
+    background: url('../images/scholarbase-sprite.png?abf') no-repeat 50px -963px;
 }
 .cal-export:hover {
     cursor: pointer;
@@ -641,10 +709,10 @@ ul ul ul ul {
     display: block;
 }
 /* Don't display the ical link in the floating box. */
+
 #cboxWrapper .node-event .links {
     display: none;
 }
-
 .view-os-events.view-id-os_events .attachment-before {
     position: absolute;
     top: -38px;
@@ -652,7 +720,6 @@ ul ul ul ul {
     text-align: right;
     width: 102px;
 }
-
 .node-event.article .node-content .links,
 .view-os-events.view-id-os_events .attachment-before .links {
     display: inline-block;
@@ -669,22 +736,28 @@ ul ul ul ul {
     position: relative;
     text-align: left;
 }
-
 .os_events_export_links {
-float: right;
-  text-align: right;
+    float: right;
+    text-align: right;
+    padding: 5px;
 }
-
 .os_events_export_links .first {
-float: left;
-  position: absolute;
-  left: 0;
-  margin-top: -20px;
+    float: left;
+    position: absolute;
+    left: 0;
+    margin-top: -20px;
+}
+.os_events_export_links .last a {
+    display: block;
 }
 
+.os_events_export_dialog {
+    text-align: center;
+}
 
-.os_events_export_links .last a {
-	display:block;
+/* Hide the top-right close button, since we handle it with the "Cancel" button */
+.os_events_export_dialog .ui-dialog-titlebar-close {
+    display: none;
 }
 
 .ical {
@@ -719,6 +792,20 @@ float: left;
     left: 0;
     content: '';
 }
+.google {
+    padding: 3px 0 3px 25px !important;
+    border-bottom: none !important;
+    position: relative;
+}
+
+.google:before {
+    background: url('../images/scholarbase-sprite.png?45678') no-repeat -76px -726px;
+    width: 22px;
+    height: 22px;
+    position: absolute;
+    left: 0;
+    content: '';
+}
 .subscribe {
     padding: 3px 0 3px 25px !important;
     border-bottom: none !important;
@@ -743,7 +830,6 @@ div.register-link-teaser .register {
     font-weight: normal;
     border-bottom: none !important;
 }
-
 .page-node.node-type-event .rss,
 .page-node.node-type-event .subscribe {
     display: inline-block;
@@ -758,6 +844,9 @@ div.register-link-teaser .register {
     display: block;
     font-style: italic;
     color: #6D6D6D;
+}
+.os-events-signup-full {
+    padding: 0 5px 5px 0;
 }
 .node-event.article .field-name-field-default-email.field-label-above {
     float: left;
@@ -1013,27 +1102,6 @@ td img {
 .entity-registration .field-label {
     padding-right: 5px;
 }
-/** Message icon overrides */
-
-div.status,
-div.error {
-    background-image: none;
-}
-div.messages:before {
-    position: absolute;
-    content: '';
-    background-image: url('../images/scholarbase-sprite.png');
-    height: 24px;
-    width: 24px;
-    top: 8px;
-    left: 8px;
-}
-div.status:before {
-    background-position: -38px -231px;
-}
-div.error:before {
-    background-position: -72px -231px;
-}
 /** Toolbar overrides */
 
 #toolbar-home a span {
@@ -1086,81 +1154,121 @@ ul.no-event-export {
     left: -110px;
     font-size: 12px;
 }
-.node-content .node-readmore {
-    display: inline-block;
-    clear: both;
-}
 /*For widget slider*/
+
 .block-boxes-os_boxes_widget_slider #layout_16_9_side div.slide {
     background: none;
 }
 .block-boxes-os_boxes_widget_slider #layout_16_9_side .slide ul.scroll li > div {
-  overflow: auto;
+    overflow: auto;
 }
 .block-boxes-os_boxes_widget_slider #layout_16_9_side .rslides_tabs {
     left: 0;
-    position: static;
+    position: relative;
     top: 0;
 }
 .block-boxes-os_boxes_widget_slider #layout_16_9_side .rslides_tabs li {
-    float:none;
-    background:transparent !important;
-        margin: 0 4px;
+    float: none;
+    background: transparent !important;
+    margin: 0 4px;
 }
 .block-boxes-os_boxes_widget_slider #layout_16_9_side .rslides_tabs li:first-of-type,
 .block-boxes-os_boxes_widget_slider #layout_16_9_side .rslides_tabs li:last-of-type {
-    display:none;
+    display: none;
+}
+.block-boxes-os_boxes_widget_slider.arrow-nav #layout_16_9_side .rslides_tabs li:first-of-type,
+.block-boxes-os_boxes_widget_slider.arrow-nav #layout_16_9_side .rslides_tabs li:last-of-type {
+    display: inline-block;
+   }
+.block-boxes-os_boxes_widget_slider.arrow-nav #layout_16_9_side .rslides_tabs li:first-of-type a,
+.block-boxes-os_boxes_widget_slider.arrow-nav #layout_16_9_side .rslides_tabs li:last-of-type a 
+{
+   background-color:transparent !important;
+    background-image: none;
 }
 
-.block-boxes-os_boxes_widget_slider #layout_16_9_side .rslides_tabs a, 
+
+.block-boxes-os_boxes_widget_slider.arrow-nav #layout_16_9_side .rslides_tabs li:first-of-type a
+{
+   width: 0;
+   height: 0;
+   border-top: 10px solid transparent;
+   border-bottom: 10px solid transparent;
+   border-right: 10px solid #000;
+   margin-right: 10px;
+}
+
+.block-boxes-os_boxes_widget_slider.arrow-nav #layout_16_9_side .rslides_tabs li:last-of-type a 
+{
+    width: 0;
+    height: 0;
+    border-top: 10px solid transparent;
+    border-bottom: 10px solid transparent;
+    border-left: 10px solid #000;
+    margin-left: 10px;
+}
+.block-boxes-os_boxes_widget_slider #layout_16_9_side .rslides_tabs a,
 .block-boxes-os_boxes_widget_slider #layout_16_9_side .rslides_tabs a:visited {
- font-weight: normal;
-       font-weight: normal;
+    font-weight: normal;
+    font-weight: normal;
     margin: 0;
     min-height: 0;
-    background-color: #000;
+    color: #000;
     width: 15px;
     height: 14px;
     border-radius: 10px;
-    font-size: 30px;
+    font-size: 45px;
     line-height: 12px;
     padding: 0;
 }
 
-.block-boxes-os_boxes_widget_slider #layout_16_9_side .rslides li {
-  list-style:none;
-}
 
+.block-boxes-os_boxes_widget_slider #layout_16_9_side .rslides_tabs .rslides_here a {
+  
+    color: #ccc;
+   
+}
+.block-boxes-os_boxes_widget_slider #layout_16_9_side .rslides li {
+    list-style: none;
+}
+.block-boxes-os_boxes_widget_slider #layout_16_9_side .slide img {
+    position: relative;
+    width:auto;
+}
 .morecontent span {
     display: none;
 }
+.morecontent span span {
+    display: inline;
+}
 .morelink {
     display: inline;
-    text-decoration:underline;
-    
+    text-decoration: underline;
 }
 .morelink span {
     font-size: .8em;
 }
+.morelink:hover {
+    cursor:pointer;
+}
 .web-widgets-iframe {
     width: 100%;
 }
-
 .os-sv-list.sv-list-view-sidebar_teaser iframe,
 .os-sv-list.sv-list-view-slide_teaser iframe,
-.os-sv-list.sv-list-view-teaser iframe  {
+.os-sv-list.sv-list-view-teaser iframe {
     width: 100% !important;
-  
 }
- .block-boxes-os_boxes_columns .os-sv-list.sv-list-view-teaser iframe,
+.block-boxes-os_boxes_columns .os-sv-list.sv-list-view-teaser iframe,
 .sidebar .os-sv-list.sv-list-view-teaser iframe,
 .sidebar .os-sv-list.sv-list-view-slide_teaser iframe,
 .content-left.content-right #content-column .os-sv-list.sv-list-view-slide_teaser iframe,
 .content-left.content-bottom #content-column .os-sv-list.sv-list-view-slide_teaser iframe,
 .content-right.content-bottom #content-column .os-sv-list.sv-list-view-slide_teaser iframe,
 .block-boxes-os_boxes_columns .os-sv-list.sv-list-view-slide_teaser iframe {
-height: auto;
+    height: auto;
 }
-
-
-
+.media-element-container {
+    height: auto !important;
+    margin: 0 1em 0 1em;
+}

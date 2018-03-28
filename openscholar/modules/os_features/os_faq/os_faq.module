@@ -128,8 +128,10 @@ function os_faq_views_query_alter(&$view, &$query) {
 function os_faq_cp_settings() {
   $settings = array();
 
+  $settings = array();
   $spaces_features = variable_get('spaces_features');
-  // FAQ settings link won't appear in CP menu if FAQ app is not enabled.
+
+  // The app won't appear in CP menu if not enabled.
   if (empty($spaces_features['os_faq'])) {
     return $settings;
   }
@@ -140,7 +142,7 @@ function os_faq_cp_settings() {
       '#title' => t('FAQs'),
       '#weight' => 3,
       '#menu_parent' => 'app_settings',
-      '#help_link' => l(t('Learn more about FAQs'), 'http://docs.openscholar.harvard.edu/faq-app#faq-app-settings', array('attributes' => array('target' => '_blank'))),
+      '#help_link' => l(t('Learn more about FAQs'), 'https://help.theopenscholar.com-app#faq-app-settings', array('attributes' => array('target' => '_blank'))),
     ),
     'form' => array(
       '#title' => t('Disable question/answer slider behavior'),
@@ -158,7 +160,7 @@ function os_faq_cp_settings() {
       '#title' => t('FAQs'),
       '#weight' => 3,
       '#menu_parent' => 'app_settings',
-      '#help_link' => l(t('Learn more about FAQs'), 'http://docs.openscholar.harvard.edu/faq-app#faq-app-settings', array('attributes' => array('target' => '_blank'))),
+      '#help_link' => l(t('Learn more about FAQs'), 'https://help.theopenscholar.com-app#faq-app-settings', array('attributes' => array('target' => '_blank'))),
     ),
     'form' => array(
       '#type' => 'radios',
@@ -170,19 +172,3 @@ function os_faq_cp_settings() {
   return $settings;
 }
 
-/**
- * Implements hook_process_HOOK() for node.tpl.php.
-*/
-function os_faq_process_node(&$vars) {
-  if ($vars['type'] == 'faq') {
-    $node_content_body_markup = $vars['content']['body'][0]['#markup'];
-    $node_title = $vars['title'];
-
-    # Ensure node has a CSS class and title (for WCAG 2.4.4 compliance)
-    $pattern = "/(.*)(<a\s+[^>]+)>(\s*read.?more[^<]*)(.*)/im";
-    if (preg_match($pattern, $node_content_body_markup, $matches)) {
-      $node_content_body_markup = $matches[1] . $matches[2] . " title=\"$node_title\" class=\"node-readmore\"" . '>' . $matches[3] . $matches[4];
-      $vars['content']['body'][0]['#markup'] = $node_content_body_markup;
-    }
-  }
-}

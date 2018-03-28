@@ -81,7 +81,7 @@ function media_browser_library_alter(&$libs) {
             'moduleRoot' => url(drupal_get_path('module', 'media_browser'), $disable),
           ),
           'version' => array(
-            'mediaBrowser' => '1.0.4'
+            'mediaBrowser' => '1.0.5'
           ),
           'extensionMap' => $map,
           'maximumFileSize' => $max_size,
@@ -98,7 +98,8 @@ function media_browser_library_alter(&$libs) {
       array('os_common', 'ng-file-upload'),
       array('os_common', 'auth'),
       array('os_common', 'angular-modal-service'),
-      array('os_common', 'locationFix')
+      array('os_common', 'locationFix'),
+      array('os_common', 'angularSlideables')
     ));
 
     $libs['media_browser']['css'] = array(

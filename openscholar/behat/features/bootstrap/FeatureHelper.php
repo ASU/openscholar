@@ -43,6 +43,7 @@ class FeatureHelp {
     'Upcoming events' => 'os_sv_list_box',
     'All Posts' => 'os_sv_list_box',
     'Cache time test' => 'os_boxes_cache_test',
+    'Solr search' => 'os_search_solr_search_box',
   );
 
   /**
@@ -513,6 +514,18 @@ class FeatureHelp {
   }
 
   /**
+   * Get vsite PURL.
+   *
+   * @param $nid
+   *   The vsite ID.
+   * @return mixed
+   *   The PURL.
+   */
+  static public function getVsitePurl($nid) {
+    return node_load($nid)->purl;
+  }
+
+  /**
    * Get the node ID by title in a given VSite.
    */
   static public function getNodeIdInVsite($title, $vsite) {
@@ -874,6 +887,22 @@ class FeatureHelp {
     $nid = array_keys($result['node']);
     $vsite = vsite_get_vsite(reset($nid));
     $vsite->controllers->variable->set($name, $value);
+  }
+
+  /**
+   * Get the variable $name for the site $vsite
+   */
+  static public function VsiteGetVariable($vsite, $name) {
+    $nid = db_select('purl', 'p')
+      ->fields('p', array('id'))
+      ->condition('value', $vsite)
+      ->condition('provider', 'spaces_og')
+      ->execute()
+      ->fetchField();
+
+    $vsite = vsite_get_vsite($nid);
+    $vsite->controllers->variable->init_overrides();
+    return $vsite->controllers->variable->get($name);
   }
 
   static public function SetReadOnly($value) {

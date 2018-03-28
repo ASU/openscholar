@@ -63,11 +63,11 @@ function os_user_default_permissions() {
     'name' => 'access overlay',
     'roles' => array(
       'administrator' => 'administrator',
+      'authenticated user' => 'authenticated user',
       'content editor' => 'content editor',
       'manager' => 'manager',
       'vsite admin' => 'vsite admin',
       'vsite user' => 'vsite user',
-      'authenticated user' => 'authenticated user',
     ),
     'module' => 'overlay',
   );
@@ -87,6 +87,7 @@ function os_user_default_permissions() {
     'roles' => array(
       'administrator' => 'administrator',
       'manager' => 'manager',
+      'os report admin' => 'os report admin',
     ),
     'module' => 'system',
   );
@@ -97,6 +98,7 @@ function os_user_default_permissions() {
     'roles' => array(
       'administrator' => 'administrator',
       'manager' => 'manager',
+      'os report admin' => 'os report admin',
     ),
     'module' => 'toolbar',
   );
@@ -352,6 +354,16 @@ function os_user_default_permissions() {
     'module' => 'system',
   );
 
+  // Exported permission: 'bypass node access'.
+  $permissions['bypass node access'] = array(
+    'name' => 'bypass node access',
+    'roles' => array(
+      'administrator' => 'administrator',
+      'web services' => 'web services',
+    ),
+    'module' => 'node',
+  );
+
   // Exported permission: 'cancel account'.
   $permissions['cancel account'] = array(
     'name' => 'cancel account',
@@ -416,6 +428,7 @@ function os_user_default_permissions() {
       'administrator' => 'administrator',
       'manager' => 'manager',
       'vsite admin' => 'vsite admin',
+      'content editor' => 'content editor',
     ),
     'module' => 'node',
   );
@@ -454,6 +467,7 @@ function os_user_default_permissions() {
     ),
     'module' => 'metatag',
   );
+
   // Exported permission: 'import media'.
   $permissions['import media'] = array(
     'name' => 'import media',
@@ -462,19 +476,6 @@ function os_user_default_permissions() {
       'manager' => 'manager',
     ),
     'module' => 'media',
-  );
-
-  // Exported permission: 'insert link into wysiwyg'.
-  $permissions['insert link into wysiwyg'] = array(
-    'name' => 'insert link into wysiwyg',
-    'roles' => array(
-      'administrator' => 'administrator',
-      'content editor' => 'content editor',
-      'manager' => 'manager',
-      'vsite admin' => 'vsite admin',
-      'vsite user' => 'vsite user',
-    ),
-    'module' => 'os_wysiwyg_link',
   );
 
   // Exported permission: 'manage features'.
@@ -504,6 +505,7 @@ function os_user_default_permissions() {
       'administrator' => 'administrator',
       'manager' => 'manager',
       'vsite admin' => 'vsite admin',
+      'content editor' => 'content editor',
     ),
     'module' => 'node',
   );
@@ -560,7 +562,11 @@ function os_user_default_permissions() {
   $permissions['view revisions'] = array(
     'name' => 'view revisions',
     'roles' => array(
-      'authenticated user' => 'authenticated user',
+      'administrator' => 'administrator',
+      'content editor' => 'content editor',
+      'manager' => 'manager',
+      'vsite admin' => 'vsite admin',
+      'vsite user' => 'vsite user',
     ),
     'module' => 'node',
   );

@@ -13,6 +13,11 @@ include_once ('includes/vsite.inc');
 //module_load_include('inc', 'spaces', 'spaces.overrides');
 
 /**
+ * Vsite public access field.
+ */
+define('VSITE_ACCESS_FIELD', 'group_access');
+
+/**
  * Defines the default vsites per user.
  */
 define('VSITE_PER_USER_DEFAULT', 1);
@@ -269,7 +274,8 @@ function vsite_form_alter(&$form, &$form_state, $form_id) {
      if ($preset = $space->controllers->variable->get('spaces_preset_' . $space->type)) {
        $preset = spaces_preset_load($preset, $space->type);
        if (!empty($form['actions']['preset'])) {
-        $form['actions']['preset']['#value'] = t('Save to !title', array('!title' => $preset->title));
+        // Removing the Save to site type button
+        unset($form['actions']['preset']);
        }
        if (!empty($form['actions']['submit'])) {
         $form['actions']['submit']['#value'] = t('Save for !name', array('!name' => $space->title()));
@@ -801,6 +807,7 @@ function vsite_vsite_exists_access($vsites = array()) {
     $purl_base_domain = variable_get('purl_base_domain', '');
     // If the domain is NOT the purl base domain, alerts user and denies access.
     if ($base_url != $purl_base_domain) {
+      watchdog('vsite', 'Base domain mismatch: @base_url', array('@base_url' => $base_url));
       drupal_set_message(t('You may not register new sites on custom domains.'), 'warning');
       return FALSE;
     }
@@ -968,7 +975,7 @@ function vsite_admin_paths_alter(&$paths){
 /**
  * Implements hook_vsite_og_node_type_info().
  */
-function vsite_vsite_og_node_type_info(){
+function vsite_vsite_og_node_type_info() {
   return array(
     'personal' => 'group',
     'project' => 'group',
@@ -1722,7 +1729,7 @@ function vsite_load_user_sites($user_id) {
     $node = node_load($site->group->nid);
     $items = array();
     $items[] = l($node->title, $site->get_absolute_url());
-    
+
     // Prepare them for theme_list_item.
     $sites_array[] = theme('item_list', array('items' => $items, 'attributes' => array('class' => array('inline'))));
   }
@@ -2019,7 +2026,7 @@ function vsite_mail_alter(&$message){
         );
 
         // Alter the body message.
-        $message['body'][0] = t("Dear !fullname, \n\n!site_owner, site owner of !site, has created a user account for you so that you may access this website. Log in by clicking on the following link or by pasting it into your browser: \n\n!login_url \n\nFor your security, this link can be used only once.  \n\nYour OpenScholar username is: !username \n\nAfter setting your OpenScholar user password with the included link, you can then <a href='http://docs.openscholar.harvard.edu/logging-your-site' target='_blank'>associate this user account with your HarvardKey</a>. \n\nOnce paired, you will be able to log in at !site in the future. Don't forget to bookmark the site and save this email for future reference.\n\nHere are some handy links for you:\n\n* <a href='http://docs.openscholar.harvard.edu/logging-your-site' target='_blank'>Logging in to your site</a>\n\n* <a href='http://hwp.harvard.edu/calendar/upcoming' target='_blank'>Sign up for training</a>\n\n* <a href='http://docs.openscholar.harvard.edu' target='_blank'>OpenScholar documentation</a>\n\n* <a href='http://hwp.harvard.edu/contact' target='_blank'>Need help with your project?</a>\n\n-The OpenScholar Team", $replacements);
+        $message['body'][0] = t("Dear !fullname, \n\n!site_owner, site owner of !site, has created a user account for you so that you may access this website. Log in by clicking on the following link or by pasting it into your browser: \n\n!login_url \n\nFor your security, this link can be used only once.  \n\nYour OpenScholar username is: !username \n\nAfter setting your OpenScholar user password with the included link, you can then <a href='https://help.theopenscholar.com/logging-your-site' target='_blank'>associate this user account with your HarvardKey</a>. \n\nOnce paired, you will be able to log in at !site in the future. Don't forget to bookmark the site and save this email for future reference.\n\nHere are some handy links for you:\n\n* <a href='https://help.theopenscholar.com/logging-your-site' target='_blank'>Logging in to your site</a>\n\n* <a href='http://hwp.harvard.edu/calendar/upcoming' target='_blank'>Sign up for training</a>\n\n* <a href='https://help.theopenscholar.com' target='_blank'>OpenScholar documentation</a>\n\n* <a href='http://hwp.harvard.edu/contact' target='_blank'>Need help with your project?</a>\n\n-The OpenScholar Team", $replacements);
 
         break;
 
@@ -2126,6 +2133,11 @@ function vsite_form_user_profile_form_alter(&$form, &$form_state, &$form_id){
   if(isset($form['field_first_name'])) {
     $form['field_first_name']['#prefix'] = '<a name="user_first_name" class="field_first_name_anchor">';
     $form['field_first_name']['#suffix'] = '</a>';
+  }
+  
+  if (module_exists('migrate_example')) {
+    // To hide the Gender field from user_profile_form #10048
+    unset($form['field_migrate_example_gender']);
   }
 }
 
@@ -2378,7 +2390,6 @@ function vsite_contact_mail_owner($form, &$form_state, $recipient){
     $form['name'] = array(
       '#type' => 'item',
       '#title' => t('From'),
-      '#markup' => t('Anonymous')
     );
 
     $form['sender_firstname'] = array(
@@ -2562,6 +2573,11 @@ function vsite_site_contact_access(){
     //Use depricated variable.
     if ($allow_contact === null) {
       $allow_contact = $space->controllers->variable->get('vsite_users_contact_form_anonymous', 'space');
+      // Enable contact form by default
+      if ($allow_contact === null) {
+        $space->controllers->variable->set('show_email', TRUE);
+        $allow_contact = TRUE;
+      }
     }
   }
   else {
@@ -2580,7 +2596,6 @@ function vsite_mail($key, &$message, $params){
     case 'user_mail' :
     case 'user_copy' :
       $user = $params['user'];
-      $account = $params['account'];
       $vsite = $params['vsite'];
       $message['subject'] = $params['subject'] . ' [via ' . variable_get('site_name', 'Drupal') . ']';
       $message['body'][] = $params['message'];
@@ -2616,6 +2631,7 @@ function vsite_mail($key, &$message, $params){
           'absolute' => TRUE,
           'language' => $language,
         ))));
+      $message['from'] = $message['headers']['Sender'] = $message['headers']['Return-Path'] = $message['headers']['From'];
       break;
   }
 }
@@ -2700,9 +2716,9 @@ function vsite_preprocess_html(&$vars){
   // If we aren't in a vsite, or if this vsite hasn't uploaded a custom favicon.
   if (empty($uri)) {
     $theme = variable_get('theme_default');
-    $uri = drupal_get_path('theme', $theme) . '/favicon.ico';
+    $uri = drupal_get_path('theme', $theme) . '/favicon.png';
     if (!file_exists($uri)) {
-      $uri = drupal_get_path('theme', 'os_basetheme') . '/favicon.ico';
+      $uri = drupal_get_path('theme', 'os_basetheme') . '/favicon.png';
     }
   }
 
@@ -3284,11 +3300,15 @@ function vsite_redirect_load_by_source_alter(&$redirects, $source, $context) {
  * Implements hook_og_default_roles_alter().
  */
 function vsite_og_default_roles_alter(&$roles) {
-  $roles = array(
+  $roles = array_unique(array_merge($roles, array(
     'vsite user',
     'content editor',
     'vsite admin',
-  );
+  )));
+
+  if ($key = array_search('administrator member', $roles)) {
+    unset($roles[$key]);
+  }
 }
 
 /**
@@ -3414,14 +3434,6 @@ function vsite_og_permission() {
     ),
     'administer book outlines' => array(
       'title' => t('Administer book outlines'),
-      'os_override' => TRUE,
-      'default role' => array(
-        'content editor',
-        'vsite admin',
-      ),
-    ),
-    'insert link into wysiwyg' => array(
-      'title' => t('Insert link into wysiwyg'),
       'os_override' => TRUE,
       'default role' => array(
         'content editor',
@@ -4056,6 +4068,41 @@ function vsite_oembed_uri_fragments($uri) {
     // if this file exists in this vsite already, add nothing. We don't want to cause duplicates.
     if (!isset($file->{OG_AUDIENCE_FIELD}) || $file->{OG_AUDIENCE_FIELD}[LANGUAGE_NONE][0]['target_id'] != $vsite->id) {
       return array($vsite->group->purl);
+    }
+  }
+}
+
+/**
+ * Implements hook_redirect_load_by_source_existing_url_alter
+ */
+function vsite_redirect_load_by_source_existing_url_alter(&$source) {
+  if(drupal_valid_path($source)) {
+    // checking and converting the source to the form as it's save
+    // on the redirect table if needed
+    $redirect_query = db_select('redirect');
+    $redirect_query->addField('redirect', 'source');
+    $redirect_query->condition('source', db_like($source), 'LIKE');
+    $redirect_query->condition('language', array($language, LANGUAGE_NONE));
+    $redirect_result = $redirect_query->execute()->fetchCol();
+    if ($redirect_result) {
+      $source = $redirect_result[0];
+    }
+    //check if vsite exist.
+    else if (module_exists('vsite') && $vsite = vsite_get_vsite()) {
+      $provider = $vsite->purl_provider;
+      // For vsite with custom domain name
+      if ($provider == 'vsite_domain') {
+        $request = parse_url($_SERVER['REQUEST_URI']);
+        $source = ltrim($request["path"], '/');
+      }
+      // For vsite without custom domain name
+      elseif ($provider == 'spaces_og') {
+        $request = parse_url($_SERVER['REQUEST_URI']);
+        $request_split = array_values(array_filter(explode('/', $request["path"])));
+        unset($request_split[0]);
+        $source_uri = implode('/', $request_split);
+        $source = $source_uri;
+      }
     }
   }
 }

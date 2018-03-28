@@ -14,8 +14,10 @@
 
     var queryArgs = {};
 
-    if (Drupal.settings.spaces.id) {
-      queryArgs.vsite = Drupal.settings.spaces.id;
+    if (Drupal.settings.spaces != undefined) {
+      if (Drupal.settings.spaces.id) {
+        queryArgs.vsite = Drupal.settings.spaces.id;
+      }
     }
 
     var baseUrl = Drupal.settings.paths.api;
@@ -72,7 +74,22 @@
       return var_name in settings;
     }
 
-    this.SaveSettings = function (settings) {
+    this.SaveSettings = function (settings, buttonName) {
+      var counts = 0;
+      angular.forEach(settings, function(val, key) {
+        if (val == 'Submit') {
+          counts++;
+        }
+      });
+      if (counts > 1 && buttonName != '') {
+        var settingsNew = {};
+          angular.forEach(settings, function(val, key) {
+          if (val != 'Submit' || key == buttonName) {
+            settingsNew[key] = val;
+          }
+        });
+        settings = settingsNew;
+      }
       console.log(settings);
 
       return $http.put(baseUrl+'/settings', settings, config);
@@ -95,7 +112,7 @@
     function link(scope, elem, attrs) {
       apSettings.SettingsReady().then(function () {
         scope.title = apSettings.GetFormTitle(scope.form);
-      })
+      });
 
       elem.bind('click', function (e) {
         e.preventDefault();
@@ -105,8 +122,8 @@
           controller: 'apSettingsFormController',
           template: '<form id="{{formId}}" name="settingsForm" ng-submit="submitForm($event)">' +
             '<div class="messages" ng-show="status.length || errors.length"><div class="dismiss" ng-click="status.length = 0; errors.length = 0;">X</div>' +
-              '<div class="status" ng-show="status.length > 0"><div ng-repeat="m in status">{{m}}</div></div>' +
-              '<div class="error" ng-show="errors.length > 0"><div ng-repeat="m in errors">{{m}}</div></div></div>' +
+              '<div class="status" ng-show="status.length > 0"><div ng-repeat="m in status track by $index"><span ng-bind-html="m"></span></div></div>' +
+              '<div class="error" ng-show="errors.length > 0"><div ng-repeat="m in errors track by $index"><span ng-bind-html="m"></span></div></div></div>' +
             '</div>' +
             '<div class="form-column-wrapper column-count-{{columnCount}}" ng-if="columnCount > 1">' +
               '<div class="form-column column-{{column_key}}" ng-repeat="(column_key, elements) in columns">' +
@@ -121,13 +138,16 @@
               '</div>' +
             '</div>' +
             '<div class="help-link" ng-bind-html="help_link"></div>' +
-          '<div class="actions"><button type="submit" button-spinner="settings_form" spinning-text="Saving">Save</button><input type="button" value="Close" ng-click="close(false)"></div></form>',
+          '<div class="actions" ng-show="showSaveButton"><button type="submit" button-spinner="settings_form_save" name="save" spinning-text="Saving">Save</button><input type="button" value="Close" ng-click="close(false)"></div></form>',
           inputs: {
             form: scope.form
           }
         })
         .then(function (modal) {
           dialogOptions.title = scope.title;
+          dialogOptions.close = function (event, ui) {
+            modal.element.remove();
+          }
           modal.element.dialog(dialogOptions);
           modal.close.then(function (result) {
             if (result) {
@@ -145,6 +165,21 @@
       }
     };
   }]);
+  
+  /**
+   * The filter for the optgroup select dropdowns.
+   */
+  m.filter("filterWithItems", function() {
+    return function(categories, present) {
+      return jQuery.grep(categories, function(category) {
+        if (present) {
+         return category.items != undefined
+        } else {
+            return category.items == undefined
+        }
+      });
+    }
+  });
 
   /**
    * The controller for the forms themselves
@@ -159,6 +194,7 @@
     $s.errors = [];
     $s.columns = {};
     $s.columnCount = 0;
+    $s.showSaveButton = true;
 
     apSettings.SettingsReady().then(function () {
       var settingsRaw = apSettings.GetFormDefinitions(form);
@@ -189,26 +225,35 @@
         }
 
         $s.formElements[k] = $s.columns[col][k] = attributes;
+
+        if ($s.formElements[k].type == 'submit') {
+          $s.showSaveButton = false;
+        }
       }
     });
 
     function submitForm($event) {
       var button = document.activeElement,
         triggered = false;
+      var buttonId = document.activeElement.id;
       if (apSettings.IsSetting(button.getAttribute('name'))) {
         triggered = true;
       }
 
+      var buttonName = '';
+      if (button.getAttribute('name')) {
+        buttonName = button.getAttribute('name');
+      }
       if ($s.settingsForm.$dirty || triggered) {
-        bss.SetState('settings_form', true);
-        apSettings.SaveSettings($s.formData).then(function (response) {
+        bss.SetState('settings_form_' + buttonName, true);
+        apSettings.SaveSettings($s.formData, buttonName).then(function (response) {
           var body = response.data;
           sessionStorage['messages'] = JSON.stringify(body.data.messages);
           $s.status = [];
           $s.error = [];
           var close = true;
           var reload = true;
-          bss.SetState('settings_form', false);
+          bss.SetState('settings_form_' + buttonName, false);
           for (var i = 0; i < body.data.length; i++) {
             switch (body.data[i].type) {
               case 'no_close':
@@ -220,14 +265,33 @@
                 $s[body.data[i].message_type].push(body.data[i].message)
             }
           }
-          if (close) {
-            $s.close(reload);
+
+          if (body.messages.status) {
+            for (var i = 0; i < body.messages.status.length; i++) {
+              if (body.messages.status[i] == 'Your updates will go live within the next 15 minutes.') {
+                $s.close(reload);
+              }
+            }
+          } else {
+            if (close && !body.messages.error) {
+              $s.close(reload);
+            } else if (body.messages.error) {
+              $s.errors = [];
+              angular.forEach(body.messages.error, function(value , key) {
+                $s.errors.push($sce.trustAsHtml(value));
+              });
+              bss.SetState('settings_form_' + buttonName, false);
+            }
           }
         }, function (error) {
           $s.errors = [];
           $s.status = [];
-          $s.errors.push("Sorry, something went wrong. Please try another time.");
-          bss.SetState('settings_form', false);
+          if (buttonId.indexOf('edit-os-importer-submit') < 0) {
+            $s.errors.push("Sorry, something went wrong. Please try another time.");
+          } else {
+            $s.errors.push("The import failed. Please review import <a href='https://help.theopenscholar.com/importing-content' target='_blank'>best practices</a> for optimal results.");
+          }
+          bss.SetState('settings_form_' + buttonName, false);
         });
       }
       else {

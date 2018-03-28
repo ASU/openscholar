@@ -26,6 +26,10 @@ class FeatureContext extends DrupalContext {
       $this->getSession()->resizeWindow(1440, 1200, 'current');
     }
 
+    // turn off Mollom CAPTCHA verification
+    variable_set('mollom_testing_mode', 1);
+    variable_del('mollom_cmp_enabled');
+
     parent::beforeScenario($event);
   }
 
@@ -43,20 +47,28 @@ class FeatureContext extends DrupalContext {
    */
   public function urlChangeHandler(StepEvent $e) {
     if ($this->currentUrl != $this->getSession()->getCurrentUrl()) {
-      $script = "
-      (function () {
-        if (!window.BehatScriptRun) {
-          window.BehatScriptRun = true;
-          window.BehatConsoleErrors = [];
-
-          window.onerror = function (error, url, line) {
-            BehatConsoleErrors.push({error: error, url: url, line: line});
-          }
-        }
-      })();
-      ";
-      $this->getSession()->executeScript($script);
+      $this->_captureJavaScriptConsoleErrors();
     }
+    $this->_printJavaScriptConsoleErrors();
+  }
+
+  private function _captureJavaScriptConsoleErrors() {
+    $script = "
+    (function () {
+      if (!window.BehatScriptRun) {
+        window.BehatScriptRun = true;
+        window.BehatConsoleErrors = [];
+
+        window.onerror = function (error, url, line) {
+          BehatConsoleErrors.push({error: error, url: url, line: line});
+        }
+      }
+    })();
+    ";
+    $this->getSession()->executeScript($script);
+  }
+
+  private function _printJavaScriptConsoleErrors() {
     if ($jserrors = $this->getSession()->evaluateScript("return window.BehatConsoleErrors")) {
       print_r($jserrors);
     }
@@ -151,6 +163,7 @@ class FeatureContext extends DrupalContext {
     $element->fillField('Password', $password);
     $submit = $element->findButton('Log in');
     $submit->click();
+    $this->user = user_load_by_name($username);
     sleep(3);
   }
 
@@ -217,6 +230,197 @@ class FeatureContext extends DrupalContext {
   }
 
   /**
+   * @Given /^I create a new "([^"]*)" with title "([^"]*)" in the "([^"]*)" site$/
+   */
+  public function iCreateANewWithTitleInTheSite ($content_type, $title, $vsite_name) {
+    $content_type = str_replace(" ", "_", $content_type);
+    $query = new EntityFieldQuery();
+    $results = $query->entityCondition('entity_type', 'node')
+                    ->propertyCondition('title', $title)
+                    ->propertyCondition('type', str_replace('-', '_', $content_type))
+                    ->execute();
+
+    if (!empty($results['node'])) {
+      FeatureHelp::deleteNode($title);
+    }
+    $entity = $this->createEntity($content_type, $title);
+
+    // Set the group ref
+    $vid = FeatureHelp::getNodeId($vsite_name);
+    $wrapper = entity_metadata_wrapper('node', $entity);
+    $wrapper->{OG_AUDIENCE_FIELD}->set(array($vid));
+    entity_save('node', $entity);
+  }
+
+  /**
+   * @Given /^I create a revision of "([^"]*)" where I change the "([^"]*)" to "([^"]*)"$/
+   */
+  public function iCreateARevisionOfWhereIChangeTheTo ($node_title, $field_name, $new_field_value) {
+    // grab first row returns when querying DB for node with the passed title
+    $query = db_select('node', 'n')
+            ->fields('n', array('nid', 'vid'))
+            ->condition('n.title', $node_title, '=');
+    $results = $query->execute()->fetchAllAssoc('nid');
+    $row = array_pop($results);
+
+    $node = node_load($row->nid, $row->vid);
+
+    $node->revision = TRUE;
+    $node->is_current = TRUE;
+    $node->status = 1;
+    $node->log = "setting $field_name to '$new_field_value'";
+    $node->revision_moderation = FALSE;
+    $node->{$field_name} = $new_field_value;
+    $node = node_submit($node);
+    node_save($node);
+  }
+
+  /**
+   * @Then /^I should not be permitted to "([^"]*)" revisions for "([^"]*)"$/
+   */
+  public function iShouldNotBePermittedToRevisionsFor($action, $node_title) {
+    if (!in_array($action, ['Delete', 'Revert'])) {
+      throw new Exception('The action ' . $action . ' does not supported by the step.');
+    }
+
+    if (node_access('update', FeatureHelp::getNodeId($node_title), $this->user)) {
+      throw new Exception('The user is not forbidden from revision page of the node');
+    }
+  }
+
+  /**
+   * @Given /^I revert "([^"]*)" to revision "(\d+)"$/
+   */
+  public function iRevertToRevision($node_title, $revision_num) {
+    $query = db_select('node', 'n')
+      ->fields('n', array('nid'))
+      ->fields('p', array('id','value'))
+      ->condition('n.title', $node_title, '=');
+    $query->innerJoin('og_membership', 'ogm', 'ogm.etid = n.nid');
+    $query->innerJoin('purl', 'p', 'p.id = ogm.gid');
+    $node_rows = $query->execute()->fetchAll(PDO::FETCH_ASSOC);
+
+    if (!count($node_rows)) {
+      throw new Exception(sprintf("Could not find node with title of '%s'.", $node_title));
+    }
+    $node_row = array_pop($node_rows);
+    $url = "/". $node_row['value'] . "/node/" . $node_row['nid'] . "/revisions";
+    $this->visit($url);
+
+    $xpath = "//div[@id='content']//table/tbody/tr/td/a[text()='Revert']";
+    $elements = $this->getSession()->getPage()->findAll('xpath', $xpath);
+    $link = $elements[$revision_num - 1];
+
+    if (!$link) {
+      throw new Exception(sprintf("Could not find revision %d for '%s'.", $revision_num, $node_title));
+    }
+    $link->press();
+
+    // lastly, click the submit button on the confirm modal
+    return array(
+      new Step\When('I press "edit-submit"'),
+    );
+  }
+
+  /**
+   * @Given /^I delete revision "(\d+)" of "([^"]*)"$/
+   */
+  public function iDeleteRevisionof($revision_num, $node_title) {
+    $query = db_select('node', 'n')
+      ->fields('n', array('nid'))
+      ->fields('p', array('id','value'))
+      ->condition('n.title', $node_title, '=');
+    $query->innerJoin('og_membership', 'ogm', 'ogm.etid = n.nid');
+    $query->innerJoin('purl', 'p', 'p.id = ogm.gid');
+    $node_rows = $query->execute()->fetchAll(PDO::FETCH_ASSOC);
+
+    if (!count($node_rows)) {
+      throw new Exception(sprintf("Could not find node with title of '%s'.", $node_title));
+    }
+    $node_row = array_pop($node_rows);
+    $url = "/". $node_row['value'] . "/node/" . $node_row['nid'] . "/revisions";
+    $this->visit($url);
+
+    $xpath = "//div[@id='content']//table/tbody/tr/td/a[text()='Delete']";
+    $elements = $this->getSession()->getPage()->findAll('xpath', $xpath);
+    $link = $elements[$revision_num - 1];
+
+    if (!$link) {
+      throw new Exception(sprintf("Could not find revision %d for '%s'.", $revision_num, $node_title));
+    }
+    $link->press();
+
+    // lastly, click the submit button on the confirm modal
+    return array(
+      new Step\When('I press "edit-submit"'),
+    );
+  }
+
+  /**
+   * @Then /^I should not be able to see the "([^"]*)" contextual link for "([^"]*)"$/
+   */
+  public function iShouldNotBeAbleToSeeTheContextualLink($linktext, $node_title) {
+    $query = db_select('node', 'n')
+      ->fields('n', array('nid'))
+      ->fields('p', array('id','value'))
+      ->condition('n.title', $node_title, '=');
+    $query->innerJoin('og_membership', 'ogm', 'ogm.etid = n.nid');
+    $query->innerJoin('purl', 'p', 'p.id = ogm.gid');
+    $node_rows = $query->execute()->fetchAll(PDO::FETCH_ASSOC);
+
+    if (!count($node_rows)) {
+      throw new Exception(sprintf("Could not find node with title of '%s'.", $node_title));
+    }
+    $node_row = array_pop($node_rows);
+    $url = "/". $node_row['value'] . "/node/" . $node_row['nid'];
+    $this->visit($url);
+    $xpath = "//div[@id='columns']//ul[contains(@class, 'contextual-links')]//a[text()='$linktext']";
+    $elements = $this->getSession()->getPage()->findAll('xpath', $xpath);
+    if (count($elements)) {
+      throw new Exception(sprintf("%s node page contains the '%s' contextual link.", $node_title, $linktext));
+    }
+  }
+
+  /**
+   * @Then /^I should be able to see "(\d+)" revisions for "([^"]*)"$/
+   */
+  public function iShouldBeAbleToSeeRevisionsFor($number_of_revisions, $node_title) {
+    $query = db_select('node', 'n')
+      ->fields('n', array('nid'))
+      ->fields('p', array('id','value'))
+      ->condition('n.title', $node_title, '=');
+    $query->innerJoin('og_membership', 'ogm', 'ogm.etid = n.nid');
+    $query->innerJoin('purl', 'p', 'p.id = ogm.gid');
+    $node_rows = $query->execute()->fetchAll(PDO::FETCH_ASSOC);
+
+    if (!count($node_rows)) {
+      throw new Exception(sprintf("Could not find node with title of '%s'.", $node_title));
+    }
+    $node_row = array_pop($node_rows);
+
+    // check to make sure the "revisions" link is available on the node view page
+    $url = "/". $node_row['value'] . "/node/" . $node_row['nid'];
+    $this->visit($url);
+    $revisions_url = $url . "/revisions";
+
+    $xpath = "//div[@id='columns']//ul[contains(@class, 'contextual-links')]//a[text()='Revisions']";
+    $elements = $this->getSession()->getPage()->findAll('xpath', $xpath);
+    if (!count($elements)) {
+      throw new Exception(sprintf("%s node page does not contain the 'revisions' contextual link.", $node_title, $url));
+    }
+
+    // check to see if the proper number of revision rows show up on the revisions page
+    $this->visit($revisions_url);
+    $action_xpath = "//div[@id='content']//table/tbody/tr/td/a[text()='Revert']";
+    $revert_elements = $this->getSession()->getPage()->findAll('xpath', $action_xpath);
+    $actual_number_of_revisions = count(node_revision_list(node_load($node_row['nid']))) - 1;
+
+    if ((count($revert_elements) != $actual_number_of_revisions) || ($number_of_revisions != $actual_number_of_revisions)) {
+      throw new Exception(sprintf("%s has %d revisions instead of %d.", $node_title, $actual_number_of_revisions, $number_of_revisions));
+    }
+  }
+
+  /**
    * @Given /^I am on a "([^"]*)" page titled "([^"]*)"(?:, in the tab "([^"]*)"|)$/
    */
   public function iAmOnAPageTitled($page_type, $title, $subpage = NULL) {
@@ -271,16 +475,18 @@ class FeatureContext extends DrupalContext {
       throw new Exception("A table with the class $class wasn't found");
     }
 
-    $table_rows = $table->getRows();
     $hash = $table->getRows();
     // Iterate over each row, just so if there's an error we can supply
     // the row number, or empty values.
-    foreach ($table_rows as $i => $table_row) {
-      if (empty($table_row)) {
-        continue;
+    foreach ($hash as $vals) {
+      $xpath_fragments = array();
+      foreach ($vals as $v) {
+        $xpath_fragments[] = 'td//text()[contains(.,"'.$v.'") and not(ancestor::*[contains(@class, "ng-hide")])]';
       }
-      if ($diff = array_diff($hash[$i], $table_row)) {
-        throw new Exception(sprintf('The "%d" row values are wrong.', $i + 1));
+      $xpath = '//tr['.implode(' and ', $xpath_fragments).']';
+      if (!$table_element->findAll('xpath', $xpath)) {
+        error_log($xpath);
+        throw new Exception("Row with the following values not found: ".implode(', ', $vals));
       }
     }
   }
@@ -335,10 +541,18 @@ class FeatureContext extends DrupalContext {
     $element = $this->getSession()->getPage();
     $url = $this->createGist($element->getContent());
     print_r('You asked to see the page content. Here is a gist contain the html: ' . $url . "\n");
-    $this->iShouldPrintPageTo(sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'screenshots' . DIRECTORY_SEPARATOR . time() . '.txt');
+
+    // Make sure the temp directory exists and is writable before using it
+    $tmpdir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'screenshots';
+    if (! file_exists($tmpdir)) {
+      mkdir($tmpdir, "0777", true);
+    }
+
+    $this->iShouldPrintPageTo($tmpdir . DIRECTORY_SEPARATOR . time() . '.txt');
     $driver = $this->getSession()->getDriver();
     $screenshot = $driver->getScreenshot();
     $gistUrl = $this->createGist('<img src="data:image/png;base64,'.base64_encode($screenshot).'">');
+    $this->iPrintPageScreenShot();
     print_r("Here is a screenshot of the page: $gistUrl\n");
   }
 
@@ -601,7 +815,7 @@ class FeatureContext extends DrupalContext {
     $privacy_level = array(
       'Public on the web.' => 0,
       'Anyone with the link.' => 2,
-      'Invite only during site creation.' => 1,
+      'Site members only.' => 1,
     );
 
     return array(
@@ -641,6 +855,281 @@ class FeatureContext extends DrupalContext {
   }
 
   /**
+   * @Given /^I create a "([^"]*)" widget for the vsite "([^"]*)" with the following <settings>:$/
+   */
+  public function iCreateAWidgetWithTheFollowingSettingsForTheVsite($widget, $vsite, TableNode $table) {
+    $metasteps = [];
+    switch (strtolower($widget)) {
+      case "custom html":
+        $widgetType = "os_boxes_html";
+        break;
+      case "list of posts":
+        $widgetType = "os_sv_list_box";
+        break;
+      case "embed media":
+        $widgetType = "os_boxes_media";
+        break;
+      case "feed reader":
+        $widgetType = "os_boxes_feedreader";
+        break;
+      case "slideshow":
+        $widgetType = "os_slideshow_box";
+        break;
+      case "dataverse list":
+        $widgetType = "os_boxes_dataverse_list";
+        break;
+      case "dataverse search box":
+        $widgetType = "os_boxes_dataverse_search";
+        break;
+      case "dataverse dataset citation":
+        $widgetType = "os_boxes_dataverse_dataset_citation";
+        break;
+      case "dataverse dataset":
+        $widgetType = "os_boxes_dataverse_dataset";
+        break;
+    }
+    $metasteps[] = new Step\When('I visit "/' . $vsite . '/os/widget/add/' . $widgetType . '/cp-layout"');
+    $hash = $table->getRows();
+
+    print "\n" . 'I visit "/' . $vsite . '#overlay=' . $vsite . '/os/widget/add/' . $widgetType . '/cp-layout"' . "\n";
+
+    foreach ($hash as $form_elements) {
+      switch ($form_elements[2]) {
+        case 'select list':
+          $values = explode(",", $form_elements[1]);
+
+          if (count($values) > 1) {
+            foreach ($values as $value) {
+              // Select multiple values from the terms options.
+              $this->getSession()
+                ->getPage()
+                ->selectFieldOption($form_elements[0], trim($value), TRUE);
+            }
+          }
+          else {
+            $metasteps[] = new Step\When('I select "' . $form_elements[1] . '" from "' . $form_elements[0] . '"');
+          }
+          break;
+        case 'checkbox':
+          $metasteps[] = new Step\When('I ' . $form_elements[1] . ' the box "' . $form_elements[0] . '"');
+          break;
+        case 'textfield':
+          $metasteps[] = new Step\When('I fill in "' . $form_elements[0] . '" with "' . $form_elements[1] . '"');
+          break;
+        case 'radio':
+          $metasteps[] = new Step\When('I select the radio button "' . $form_elements[0] . '" with the id "' . $form_elements[1] . '"');
+          break;
+      }
+    }
+
+    if ($widgetType != "os_slideshow_box") {
+      // Skip Make Embeddable step for slide show widget
+      $metasteps[] = new Step\When('I check the box "edit-make-embeddable"');
+    }
+    $metasteps[] = new Step\When('I make sure admin panel is closed');
+    $metasteps[] = new Step\When('I press "Save"');
+    return $metasteps;
+  }
+
+  /**
+   * @Given /^I drag the "([^"]*)" widget to the "([^"]*)" region$/
+   */
+  public function iDragTheWidgetToTheRegion($widget_label, $region_name) {
+
+    $widget_name_label_map = array(
+      "Active book TOC"                        => "boxes-box-active-book-toc",
+      "All Posts"                              => "boxes-box-all-posts",
+      "Blog RSS Feed"                          => "boxes-blog_rss_feed",
+      "Contact"                                => "boxes-hwp_personal_contact_html",
+      "Filter by taxonomy for pages"           => "boxes-vocabulary_filter_pages",
+      "Filter by term"                         => "boxes-box-filter-by-term",
+      "Front page header text"                 => "boxes-iqss_scholars_fp_headertext",
+      "HWP Option Info text"                   => "boxes-iqss_scholars_fp_hwp_option",
+      "Latest News"                            => "boxes-os_news_latest",
+      "Latest Publications"                    => "boxes-boxes-os_boxes_feedreader",
+      "List of posts"                          => "boxes-box-list-of-posts",
+      "Recent FAQs"                            => "boxes-os_faq_sv_list",
+      "Recent Images"                          => "boxes-os_image_gallery_latest",
+      "Recent Presentations"                   => "boxes-os_presentations_recent",
+      "Recent Publications"                    => "boxes-os_publications_recent",
+      "Scholars Info text with video link"     => "boxes-iqss_scholars_fp_infoblock",
+      "Scholars Learn More Box"                => "boxes-iqss_scholars_fp_learnmore",
+      "Scholars Learn More Toggle Page"        => "boxes-iqss_scholars_learnmore_toggle",
+      "Scholars Logo"                          => "boxes-iqss_scholars_fp_logoblock",
+      "Scholars fixed-position header."        => "boxes-iqss_scholars_fixed_header",
+      "Search box"                             => "boxes-solr_search_box",
+      "Site RSS Feed"                          => "boxes-os_rss",
+      "Subscribe to MailChimp mailing list"    => "boxes-os_box_mailchimp",
+      "Upcoming Events"                        => "boxes-os_events_upcoming",
+      "Active Book's TOC"                      => "boxes-os_booktoc",
+      "AddThis"                                => "boxes-os_addthis",
+      "Blog Archive"                           => "views-os_blog-block",
+      "Blog RSS Feed"                          => "boxes-blog_rss_feed",
+      "Contact"                                => "boxes-hwp_personal_contact_html",
+      "Filter News by Month"                   => "views-os_news-news_by_month_block",
+      "Filter News by Year"                    => "views-os_news-news_by_year_block",
+      "Filter Profiles by Alphabetical Groups" => "views-os_profiles-filter_by_alphabet",
+      "Filter by taxonomy for pages"           => "boxes-vocabulary_filter_pages",
+      "Front page header text"                 => "boxes-iqss_scholars_fp_headertext",
+      "Google Translate"                       => "os_ga-google_translate",
+      "HWP Option Info text"                   => "boxes-iqss_scholars_fp_hwp_option",
+      "Latest Publications"                    => "boxes-boxes-os_boxes_feedreader",
+      "Mini Calendar"                          => "views-os_events-block_1",
+      "Primary Menu"                           => "os-primary-menu",
+      "Recent Documents"                       => "boxes-os_booklets_recent_docs",
+      "Recent FAQs"                            => "boxes-os_faq_sv_list",
+      "Recent Images"                          => "boxes-os_image_gallery_latest",
+      "Recent Presentations"                   => "boxes-os_presentations_recent",
+      "Recent Publications"                    => "boxes-os_publications_recent",
+      "Recent Software Releases"               => "views-os_software_releases-block_1",
+      "Scholars Info text with video link"     => "boxes-iqss_scholars_fp_infoblock",
+      "Scholars Learn More Box"                => "boxes-iqss_scholars_fp_learnmore",
+      "Scholars Learn More Toggle Page"        => "boxes-iqss_scholars_learnmore_toggle",
+      "Scholars Logo"                          => "boxes-iqss_scholars_fp_logoblock",
+      "Scholars"                               => "boxes-iqss_scholars_fixed_header",
+      "Search box"                             => "boxes-solr_search_box",
+      "Site RSS Feed"                          => "boxes-os_rss",
+      "Subscribe to MailChimp mailing list"    => "boxes-os_box_mailchimp",
+      "Upcoming Events"                        => "boxes-os_events_upcoming",
+    );
+
+    $region_names = array(
+      "header-first",
+      "header-second",
+      "header-third",
+      "menu-bar",
+      "sidebar-first",
+      "content",
+      "content-top",
+      "content-first",
+      "content-second",
+      "content-bottom",
+      "sidebar-second",
+      "footer-first",
+      "footer",
+      "footer-third",
+      "footer-bottom",
+    );
+
+    if (! in_array($region_name, $region_names)) {
+      throw new Exception("I do not recognize the region name: $region_name.");
+    }
+
+    $css_selector = $widget_name_label_map[$widget_label];
+    $widget_icon = $this->getSession()->getPage()->find('css', "div#$css_selector");
+    if (! $widget_icon) {
+      throw new Exception("I could not find a widget for '$widget_label'.");
+    }
+
+    $region_element = $this->getSession()->getPage()->find('css', "div#edit-layout-$region_name");
+    if (! $region_element) {
+      throw new Exception("I could not find a region for '$region_name'.");
+    }
+    $widget_icon->dragTo($region_element);
+
+    $save_button = $this->getSession()->getPage()->find('css', "input#edit-submit");
+    if (! $save_button) {
+      throw new Exception("I could not find a save button using css selector 'input#edit-submit'.");
+    }
+
+    $save_button->click();
+  }
+
+  /**
+   * @Given /^I click the big gear$/
+   */
+  public function iClickTheBigGear() {
+    $big_gear = $this->getSession()->getPage()->find('css', "a.ctools-dropdown-link.ctools-dropdown-text-link");
+    if (! $big_gear) {
+      throw new Exception("I did not locate the big gear icon.");
+    }
+    $big_gear->click();
+  }
+
+  /**
+   * @Given /^the widget "([^"]*)" is placed in the "([^"]*)" layout$/
+   */
+  public function theWidgetIsPlacedInTheLayout($widget, $page) {
+
+    $page_mapping = array(
+      'News' => 'news_news',
+      'Blog' => 'blog_blog',
+      'Link' => 'links_links',
+      'Reader' => 'reader_reader',
+      'Calendar' => 'events_events',
+      'Classes' => 'classes_classes',
+      'People' => 'profiles_profiles',
+      'Galleries' => 'gallery_gallery',
+      'FAQ' => 'faq_faq',
+      'Software' => 'software_software',
+      'Documents' => 'booklets_booklets',
+      'Publications' => 'publications_publications',
+      'Presentations' => 'presentations_presentations',
+    );
+
+    $q = db_select('spaces_overrides', 'so')
+      ->fields('so', array('object_id', 'id'))
+      ->condition('value', '%s:5:"title";s:' . strlen($widget) . ':"' . $widget . '";%', 'LIKE')
+      ->condition('object_type', 'boxes', '=');
+    $results = $q->execute()->fetchAll();
+    $row = array_pop($results);
+    $vsite = spaces_load('og', $row->id);
+
+    $page_id = FeatureHelp::GetNodeId($page);
+
+    if (array_key_exists($page, $page_mapping)) {
+      $blocks = $vsite->controllers->context->get($page_mapping[$page] . ":reaction:block");
+      $blocks['blocks']['boxes-' . $row->object_id] = array(
+        'module' => 'boxes',
+        'delta' => $row->object_id,
+        'title' => $widget,
+        'region' => 'sidebar_second',
+        'status' => 0,
+        'weight' => 0
+      );
+      $vsite->controllers->context->set($page_mapping[$page] . ":reaction:block", $blocks);
+    } else {
+      $blocks = $vsite->controllers->context->get('os_pages-page-' . $page_id . ":reaction:block");
+      $blocks['blocks']['boxes-' . $row->object_id] = array(
+        'module' => 'boxes',
+        'delta' => $row->object_id,
+        'title' => $widget,
+        'region' => 'sidebar_second',
+        'status' => 0,
+        'weight' => 0
+      );
+      $vsite->controllers->context->set('os_pages-page-' . $page_id . ":reaction:block", $blocks);
+    }
+  }
+
+  /**
+   * @Given /^the dataverse widget "([^"]*)" is placed in the "([^"]*)" layout$/
+   */
+  public function theDataverseWidgetIsPlacedInTheLayout($widget, $page) {
+    $q = db_select('spaces_overrides', 'so')
+      ->fields('so', array('object_id', 'id'))
+      ->condition('value', '%s:5:"title";s:' . strlen($widget) . ':"' . $widget . '";%', 'LIKE')
+      ->condition('object_type', 'boxes', '=');
+    $results = $q->execute()->fetchAll();
+    $row = array_pop($results);
+
+    $page_id = FeatureHelp::GetNodeId($page);
+
+    $vsite = spaces_load('og', $row->id);
+    $blocks = $vsite->controllers->context->get('os_pages-page-' . $page_id . ":reaction:block");
+    $blocks['blocks']['boxes-' . $row->object_id] = array(
+      'module' => 'boxes',
+      'delta' => $row->object_id,
+      'title' => $widget,
+      'region' => 'content_first',
+      'status' => 0,
+      'weight' => 0
+    );
+    $vsite->controllers->context->set('os_pages-page-' . $page_id . ":reaction:block", $blocks);
+
+  }
+
+  /**
    * @Given /^the widget "([^"]*)" is set in the "([^"]*)" page with the following <settings>:$/
    */
   public function theWidgetIsSetInThePageWithSettings($page, $widget, TableNode $table) {
@@ -658,7 +1147,7 @@ class FeatureContext extends DrupalContext {
 
     $metasteps = array();
     // @TODO: Don't use the hard coded address - remove john from the address.
-    $this->visit('john/os/widget/boxes/' . $delta . '/edit');
+    $this->visit(FeatureHelp::getVsitePurl($this->nid) . '/os/widget/boxes/' . $delta . '/edit');
 
     // @TODO: Use XPath to fill the form instead of giving the type of the in
     // the scenario input.
@@ -850,11 +1339,11 @@ class FeatureContext extends DrupalContext {
   }
 
   /**
-   * @Then /^I should see tineMCE in "([^"]*)"$/
+   * @Then /^I should see CKEDITOR in "([^"]*)"$/
    */
   public function iShouldSeeTinemceIn($field) {
     $page = $this->getSession()->getPage();
-    $iframe = $page->find('xpath', "//label[contains(., '{$field}')]//..//iframe[@id='edit-body-und-0-value_ifr']");
+    $iframe = $page->find('xpath', "//label[contains(., '{$field}')]//..//iframe[contains(@class, 'cke')]");
 
     if (!$iframe) {
       throw new Exception("tinyMCE wysiwyg does not appear.");
@@ -1203,7 +1692,7 @@ class FeatureContext extends DrupalContext {
         $john_response_code = $this->responseCode($baseUrl . $row[0]);
         $lincoln_response_code = $this->responseCode('http://lincoln.local/' . $row[0]);
         if ($john_response_code != $row[1] && $lincoln_response_code != $row[1]) {
-          throw new Exception("When visiting {$row[0]} we did not get a {$row[1]} reponse code but the {$john_response_code}/{$lincoln_response_code} reponse code.");
+          throw new Exception("When visiting {$row[0]} we did not get a {$row[1]} response code but the {$john_response_code}/{$lincoln_response_code} response code.");
         }
       }
     }
@@ -1231,7 +1720,7 @@ class FeatureContext extends DrupalContext {
 
         $response_code = $this->responseCode($baseUrl . $VisitUrl);
         if ($response_code != $row[3]) {
-          throw new Exception("When visiting {$VisitUrl} we did not get a {$row[3]} reponse code but the {$response_code} reponse code.");
+          throw new Exception("When visiting {$VisitUrl} we did not get a {$row[3]} response code but the {$response_code} response code.");
         }
       }
     }
@@ -1273,7 +1762,6 @@ class FeatureContext extends DrupalContext {
    */
   public function iSearchFor($item) {
     return array(
-      new Step\When('I visit "john"'),
       new Step\When('I fill in "search_block_form" with "'. $item . '"'),
       new Step\When('I press "Search"'),
     );
@@ -1502,6 +1990,34 @@ class FeatureContext extends DrupalContext {
   }
 
   /**
+   * @When /^I select the radio button under "([^"]*)" with a label containing "([^"]*)"$/
+   */
+  public function iSelectRadioButtonUnderWithALabelContaining($under_label, $label_containing) {
+    $page = $this->getSession()->getPage();
+
+    $radiobutton = $page->find('xpath', "//label[starts-with(text(), '$under_label')]/..//div[contains(text(), '$label_containing')]/input");
+
+    if (!$radiobutton) {
+      throw new Exception("A radio button with the name {$name} and value {$value} was not found on the page");
+    }
+    $radiobutton->selectOption(true, FALSE);
+  }
+
+  /**
+   * @When /^I select the "([^"]*)" button with value "([^"]*)"$/
+   */
+  public function iSelectTypedButtonWithValueXyz($button_type, $button_value) {
+    $page = $this->getSession()->getPage();
+    $radiobutton = $page->find('xpath', "//input[@type='$button_type'][@value='$button_value']");
+    if (!$radiobutton) {
+      throw new Exception("A '$button_type' button with the value {$button_value} was not found on the page.");
+    }
+    $radiobutton->selectOption($button_value, FALSE);
+  }
+
+
+
+  /**
    * @When /^I choose the radio button named "([^"]*)" with value "([^"]*)" for the vsite "([^"]*)"$/
    */
   public function iSelectRadioNamedWithValueForVsite($name, $value, $vsite) {
@@ -1651,17 +2167,6 @@ class FeatureContext extends DrupalContext {
       print_r('An error: ' . $e->getMessage());
       print_r('page: ' . $page);
     }
-  }
-
-  /**
-   * @When /^I edit the page meta data of "([^"]*)" in "([^"]*)"$/
-   */
-  public function iEditTheMetaTags($title, $group) {
-    $nid = FeatureHelp::GetNodeId($title);
-
-    return array(
-      new Step\When('I visit "' . $group . '/os/pages/' . $nid . '/meta"'),
-    );
   }
 
   /**
@@ -1990,6 +2495,18 @@ class FeatureContext extends DrupalContext {
   }
 
   /**
+   * @Then /^I should see the FAQ "([^"]*)" comes before "([^"]*)"$/
+   */
+  public function iShouldSeeTheFaqComesBefore($first, $second) {
+    $page = $this->getSession()->getPage()->getContent();
+
+    $pattern = '/<div class="view-content">[\s\S]*' . $first . '[\s\S]*' . $second . '[\s\S]*<\/section>/';
+    if (!preg_match($pattern, $page)) {
+      throw new Exception("The FAQ '$first' does not come before the FAQ '$second'.");
+    }
+  }
+
+  /**
    * @Given /^I define "([^"]*)" domain to "([^"]*)"$/
    */
   public function iDefineDomainTo($vsite, $domain) {
@@ -2056,21 +2573,147 @@ class FeatureContext extends DrupalContext {
     if ($element) {
       throw new Exception("A button with id|name|value equal to '$button' was found.");
     }
-}
+  }
 
   /**
    * @Given /^I set feature "([^"]*)" to "([^"]*)" on "([^"]*)"$/
    */
   public function iSetFeatureStatus ($feature, $status, $group) {
-    return array(
+
+    $features = FeatureHelp::VsiteGetVariable($group, 'spaces_features');
+    $info = spaces_features('og');
+
+    $current_value = "current value not found";
+
+    foreach ($info as $k => $i) {
+      if ($i->info['name'] == $feature) {
+        $current_value = $features[$k];
+        break;
+      }
+    }
+
+    /* cases
+     * Disabled > Enabled
+     * Disabled > Private
+     * Enabled > Disabled
+     * Enabled > Private
+     * Private > Enabled
+     * Private > Disabled
+     *
+     * Private = 2
+     * Enabled = 1
+     * Disabled  = 0
+     */
+
+    switch ($status) {
+      case 'Disabled':
+      default:
+        $new_value = 0;
+        break;
+      case 'Enabled':
+      case 'Public':
+        $new_value = 1;
+        break;
+      case 'Private':
+        $new_value = 2;
+        break;
+    }
+
+    $opening = array(
       new Step\When('I visit "' . $group . '"'),
       new Step\When('I make sure admin panel is open'),
       new Step\When('I open the admin panel to "Settings"'),
       new Step\When('I sleep for "1"'),
-      new Step\When('I click "Enable / Disable Apps"'),
-      new Step\When('I select "' . $status . '" from "' . $feature . '"'),
-      new Step\When('I press "edit-submit"'),
+      new Step\When('I click on the "Enable / Disable Apps" control'),
+      new Step\When('I scroll to find "'.$feature.'" in the ".app-form" element'),
+      new Step\When('I wait "1 second"')
     );
+
+    $closer = array(
+      new Step\When('I wait "5 seconds"'),
+      new Step\When('I scroll to find "Save"'),
+      new Step\When('I press "Save"'),
+      new Step\When("I wait for page actions to complete"),
+    );
+
+    $enable = array(
+      new Step\When('I check the "Enable" box in the "'.$feature.'" row'),
+    );
+
+    $disable = array(
+      new Step\When('I check the "Disable" box in the "'.$feature.'" row'),
+    );
+
+    $public = array(
+      new Step\When('I click the "[app-privacy-selector]" control in the "'.$feature.'" row'),
+      new Step\When('I click the "Everyone" control in the "'.$feature.'" row'),
+    );
+
+    $private = array(
+      new Step\When('I click the "[app-privacy-selector]" control in the "'.$feature.'" row'),
+      new Step\When('I click the "Site Members" control in the "'.$feature.'" row'),
+    );
+
+    $output = array();
+    if ($current_value === "current value not found") {
+      throw new Exception("No current value found for feature '$feature'");
+    }
+    if ($current_value == $new_value) {
+      return;
+    }
+    else if ($new_value == 0) {
+      $output = array_merge($opening, $disable, $closer);
+    }
+    elseif ($current_value == 0 && $new_value == 1) {
+      $output = array_merge($opening, $enable, $closer);
+    }
+    else if ($current_value == 0 && $new_value == 2) {
+      $output = array_merge($opening, $enable, $closer, $opening, $private, $closer);
+    }
+    else if ($current_value == 1 && $new_value == 2) {
+      $output = array_merge($opening, $private, $closer);
+    }
+    else if ($current_value == 2 && $new_value == 1) {
+      $output = array_merge($opening, $public, $closer);
+    }
+
+    return $output;
+  }
+
+  /**
+   * @Given /^I check the "([^"]*)" box in the "([^"]*)" row$/
+   */
+  public function iCheckTheBoxInTheRow($column, $row) {
+    $x = '//table/tbody/tr[contains(.,"'.$row.'")]/td[count(//table/thead/tr/th[.="'.$column.'"]/preceding-sibling::th)+1]/input[@type="checkbox"]';
+    $elem = $this->getSession()->getPage()->find('xpath', $x);
+    if (!$elem) {
+      throw new Exception("No checkbox in the \"$column\" column of row \"$row\"");
+    }
+
+    // We cannot use check() on angular forms. Angular WILL NOT detect the changes to the model.
+    // We have to use click()
+    $elem->click();
+  }
+
+  /**
+   * @Given /^I click the "([^"]*)" control in the "([^"]*)" row$/
+   */
+  public function iClicktheControlInTheRow($control, $row) {
+    $x = '//table/tbody/tr[contains(.,"'.$row.'")]/td//';
+    if ($control[0] == '[') {
+      // this is an angular directive we're clicking on
+      $control = trim($control, '[]');
+      $x .= "*[@$control]";
+    }
+    else {
+      $x .= '*[.="'.$control.'"]';
+    }
+    $elem = $this->getSession()->getPage()->find('xpath', $x);
+    if (!$elem) {
+      throw new Exception("No control \"$control\" in the row \"$row\"");
+    }
+
+    $elem->click();
   }
 
   /**
@@ -2361,8 +3004,29 @@ class FeatureContext extends DrupalContext {
    * @Given /^I can't visit "([^"]*)"$/
    */
   public function iCanTVisit($url) {
+    $access_denied_string = "denied";
+
     $this->visit($url);
-    $this->assertSession()->statusCodeEquals(403);
+    try {
+      $this->assertSession()->statusCodeEquals(403);
+    } catch (Exception $e) {
+      print "No status code found.\n";
+      print "Checking for '$access_denied_string' in page content.\n";
+    }
+    $content = $this->getSession()->getPage()->getContent();
+    if (preg_match("/$access_denied_string/i", $content)) {
+      return;
+    }
+ 
+    throw new Exception("Did not get 403 status code or '$access_denied_string'.");
+  }
+
+  /**
+   * @Given /^I fill in the "([^"]*)" "([^"]*)" field under "([^"]*)" with "([^"]*)"$/
+   */
+  public function iFillInTheFieldContainingText($nth, $field_type, $field_under_text, $value) {
+    $element = $this->_getNthFieldBelowXyz($nth, $field_type, $field_under_text);
+    $element->setValue($value);
   }
 
   /**
@@ -2791,6 +3455,23 @@ class FeatureContext extends DrupalContext {
   }
 
   /**
+   * @Given /^I should match the regex "([^"]*)"$/
+   *
+   * This step is used to match a regular expression in the page
+   */
+  public function iShouldMatchTheRegex($pattern) {
+    $page_text = $this->getSession()->getPage()->getText();
+
+    $page_text = preg_replace('/\s+/u', ' ', $page_text);
+    $regex = '/'.$pattern.'/iu';
+
+    if (!preg_match($regex, $page_text)) {
+      $message = sprintf('The regex pattern "%s" did not appear in the text of this page, but it should have.', $pattern);
+      throw new Exception($message);
+    }
+  }
+
+  /**
    * @Then /^I should wait for the text "([^"]*)" to "([^"]*)"$/
    */
   public function iShouldWaitForTheTextTo($text, $appear) {
@@ -2806,7 +3487,6 @@ class FeatureContext extends DrupalContext {
   }
 
   /**
-   * Wait for an element by its XPath to appear or disappear.
    *
    * @param string $xpath
    *   The XPath string.
@@ -3344,7 +4024,6 @@ class FeatureContext extends DrupalContext {
   }
 
   /**
-<<<<<<< HEAD
    * @Given /^I make sure admin panel is open$/
    */
   public function adminPanelOpen() {
@@ -3365,15 +4044,37 @@ class FeatureContext extends DrupalContext {
   }
 
   /**
+   * @Given /^I make sure admin panel is closed$/
+   */
+  public function adminPanelClosed() {
+    $page = $this->getSession()->getPage();
+    $this->waitForPageActionsToComplete();
+    if (! $page->find('css', '[left-menu].closed')) {
+      return array(
+        new Step\When('I press "Close Menu"'),
+        new Step\When('I sleep for "1"'),
+      );
+    }
+    elseif (!$page->find('css', '[left-menu]')) {
+      throw new \Exception("The admin panel was not found on this page. Are you sure its installed and enabled?");
+    }
+
+    return array();
+  }
+
+  /**
    * @Given /^I open the admin panel to "([^"]*)"$/
    */
   public function iOpenAdminPanelTo($text) {
     $output = $this->adminPanelOpen();
     $page = $this->getSession()->getPage();
 
+    $this->_captureJavaScriptConsoleErrors();
+
     //$elem = $page->find('xpath', "//*[text() = '{$text}']/ancestor::li[@admin-panel-menu-row]");
     $elem = $page->find('xpath', "//li[@admin-panel-menu-row]/descendant::span[text()='$text']/ancestor::li[@admin-panel-menu-row][1]");
     if (!$elem) {
+      $this->_printJavaScriptConsoleErrors();
       throw new \Exception("The link $text cannot be found in the admin panel.");
     }
     if (!$elem->hasClass('open')) {
@@ -3389,10 +4090,10 @@ class FeatureContext extends DrupalContext {
    */
   public function iOpenUserMenu() {
     $page = $this->getSession()->getPage();
-    while (!$page->find('css', 'div[right-menu-toggle]')) {
+    while (!$page->find('css', '.topRight_Menu')) {
       usleep(100);
     }
-    if ($elem = $page->find('css', 'div[right-menu-toggle]')) {
+    if ($elem = $page->find('css', '.topRight_Menu')) {
       $elem->click();
       sleep(1);
     }
@@ -3400,6 +4101,17 @@ class FeatureContext extends DrupalContext {
       $url = $this->getSession()->getCurrentUrl();
       throw new \Exception("Could not find user menu on page $url");
     }
+  }
+
+  /**
+   * @Given /^I visit the Add class material URL for "([^"]*)" on vsite "([^"]*)"$/
+   */
+  public function iVisitTheAddClassMaterialUrl($url, $vsite) {
+
+    $session = $this->getSession();
+    $nid = $this->_getNodeIdOfUrl("$vsite/$url");
+
+    return new Step\When('I visit "' . $vsite . '/node/add/class-material?field_class=' . $nid . '"');
   }
 
   /**
@@ -3514,6 +4226,39 @@ JS;
   }
 
   /**
+   * @When /^I scroll to find "([^"]*)"$/
+   */
+  function iScrollToFind($text) {
+    $this->getSession()->executeScript("
+      var result = document.evaluate('//*[.=\"$text\"]', document.body, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+      var elem = result.singleNodeValue;
+      elem.scrollIntoView();
+    ");
+  }
+
+  /**
+   * @When /^I scroll to find "([^"]*)" in the "([^"]*)" element$/
+   */
+  function iScrollToFindInElement($text, $selector) {
+    $script = '';
+    switch($selector[0]) {
+      case '/':
+        // xpath
+        $script .= 'var result = document.evaluate("'.$selector.'", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);';
+        $script .= 'var elem = result.singleNodeValue;';
+        break;
+      case '.':
+      case '#':
+        // css
+        $script .= 'var elem = document.querySelector("'.$selector.'");';
+    }
+
+    $script .= "var target = document.evaluate('.//*[.=\"$text\"]', elem, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;";
+    $script .= "target.scrollIntoView()";
+    $this->getSession()->executeScript($script);
+  }
+
+  /**
    * @When /^I set the form "([^"]*)" to "([^"]*)"$/
    */
   public function iSetTheFormTo($form, $dirtiness) {
@@ -3546,7 +4291,7 @@ JS;
    */
   public function iAmVerifyingTheDatePickerBehaviour() {
     $page = $this->getSession()->getPage();
-    $page->find('xpath', '//input[@id="edit-published"]')->click();
+    $page->find('xpath', '//input[@id="edit-biblio-year-coded-0"]')->click();
 
     $month_picker = $page->find('xpath', '//div[@id="edit-field-biblio-pub-month"]');
     $day_picker = $page->find('xpath', '//div[@id="edit-field-biblio-pub-day"]');
@@ -3571,6 +4316,7 @@ JS;
   public function iCreateANewPublicationWithADatePicker() {
     $this->randomizeMe();
     $this->getSession()->getDriver()->executeScript('CKEDITOR.instances["edit-title-field-und-0-value"].setData("' . $this->randomText . '");');
+    $this->getSession()->getPage()->find('xpath', '//input[@id="edit-biblio-year-coded-0"]')->click();
     $this->getSession()->getPage()->find('xpath', '//input[@id="edit-biblio-year"]')->setValue('2010');
     $this->getSession()->getPage()->pressButton('Save');
     $this->assertTextVisible("Forthcoming. “{$this->randomText},” 2010.");
@@ -3588,7 +4334,7 @@ JS;
 
     $this->getSession()->getPage()->find('xpath', '//input[@id="edit-biblio-year"]')->setValue('2010');
 
-    $page->find('xpath', '//input[@id="edit-published"]')->click();
+    $page->find('xpath', '//input[@id="edit-biblio-year-coded-0"]')->click();
     $page->find('xpath', '//div[@id="s2id_edit-field-biblio-pub-month-und"]//a[@class="select2-choice"]')->click();
     $page->find('xpath', '//ul[@class="select2-results"]//li[contains(@class, "select2-result-selectable")][3]')->click();
 
@@ -3621,4 +4367,769 @@ JS;
     FeatureHelp::variableSetSpace($name, $val, $vsite);
   }
 
+  /**
+   * @When /^I open the "([^"]*)" settings form for the site "([^"]*)"$/
+   */
+  public function iNavigateCpSettings($type, $vsite) {
+
+    return array(
+      new Step\When('I visit "' . $vsite . '"'),
+      new Step\When('I open the admin panel to "Settings"'),
+      new Step\When('I open the admin panel to "App Settings"'),
+      new Step\When('I click on the "' . trim($type) . '" control in the ".menu-container .simplebar-scroll-content" element'),
+    );
+  }
+
+  /**
+   * @When /^I submit cp settings of the site$/
+   */
+  public function iSubmitCpSettings() {
+
+    return array(
+      new Step\When('I press "Save"'),
+      new Step\When('I wait for page actions to complete'),
+    );
+  }
+
+  /**
+   * @When /^I change publication citation style to "([^"]*)"$/
+   */
+  public function iChangePublicationType($type) {
+
+    return array(
+      new Step\When('I click on the "' . trim($type) . '" control'),
+    );
+  }
+
+  /**
+   * @When /^I uncheck the box "([^"]*)" with id "([^"]*)" publication citation filter$/
+   */
+  public function iChangePublicationFilter($type, $id) {
+
+    $page = $this->getSession()->getPage();
+    $element = $page->find('xpath', "//input[@id='{$id}']");
+    if ($element->isChecked()) {
+        return array(
+        new Step\When('I click on the "' . trim($type) . '" control'),
+      );
+    }
+  }
+
+  /**
+   * @Given /^I set the default site to "([^"]*)"$/
+   */
+  public function iSetTheDefaultSiteTo($site) {
+    $this->nid = FeatureHelp::getNodeId($site);
+  }
+
+  /**
+   * @When /^Switch to the iframe "([^"]*)"$/
+   */
+  public function switchToTheIframe($iframe_id) {
+    $this->waitFor(function (FeatureContext $context) {
+      if ($overlay = $context->getSession()->getPage()->find('css', 'iframe.media-modal-frame')) {
+        $context->getSession()->switchToIframe("mediaStyleSelector");
+        return true;
+      }
+      return false;
+    }, 20000);
+  }
+
+  /**
+   * @When /^I click on the first "([^"]*)" control in the "([^"]*)" element$/
+   */
+  public function iClickOnFirstControlInElement($text, $css) {
+    $page = $this->getSession()->getPage();
+    $parents = $page->findAll('css', $css);
+
+    foreach ($parents as $p) {
+      if ($p->isVisible()) {
+        if ($elem = $p->find('xpath', "//*[text() = '{$text}']")) {
+          $elem->click();
+          return;
+        }
+        else {
+          throw new ElementNotFoundException($this->getSession(), "No $text found in $css element.");
+        }
+      }
+    }
+  }
+
+  /**
+   * Click on the element with the provided xpath query
+   *
+   * @When /^I click on the element with xpath "([^"]*)"$/
+   */
+  public function iClickOnTheElementWithXPath($xpath) {
+    $session = $this->getSession(); // get the mink session
+    $element = $session->getPage()->find(
+        'xpath',
+        $session->getSelectorsHandler()->selectorToXpath('xpath', $xpath)
+    ); // runs the actual query and returns the element
+
+    // errors must not pass silently
+    if (null === $element) {
+        throw new \InvalidArgumentException(sprintf('Could not evaluate XPath: "%s"', $xpath));
+    }
+
+    // ok, let's click on it
+    $element->click();
+  }
+
+  /**
+   * Click on the element with the provided CSS Selector
+   *
+   * @When /^I click on the element with css selector "([^"]*)"$/
+   */
+  public function iClickOnTheElementWithCSSSelector($cssSelector) {
+    $session = $this->getSession();
+    $element = $session->getPage()->find(
+        'xpath',
+        $session->getSelectorsHandler()->selectorToXpath('css', $cssSelector) // just changed xpath to css
+    );
+    if (null === $element) {
+        throw new \InvalidArgumentException(sprintf('Could not evaluate CSS Selector: "%s"', $cssSelector));
+    }
+    $element->click();
+  }
+
+  /*
+   * Helper to get unaliased edit path from Drupal URL
+   */
+  private function _getUnaliasedPathFromAliasPath($url, $vsite) {
+
+    foreach (array("$vsite/", "") as $prefix) {
+
+      $unaliased_path = drupal_lookup_path('source', "$prefix$url");
+
+      if (! $unaliased_path) {
+        $nid = $this->_getNodeIdOfUrl("$prefix$url");
+        $unaliased_path = "$vsite/node/$nid";
+        break;
+      } else {
+        break;
+      }
+    }
+
+    return $unaliased_path;
+  }
+
+  /**
+   * Visit the internal (unaliased) Drupal path of the current page
+   *
+   * @When /^I visit to delete the post "([^"]*)" on vsite "([^"]*)"$/
+   */
+  public function iVisitTheDeletePathOfPage($url, $vsite) {
+    $unaliased_path = drupal_lookup_path('source', $url);
+
+    # Check the url with the vsite prepended
+    if (! $unaliased_path) {
+      $unaliased_path = drupal_lookup_path('source', "$vsite/$url");
+    }
+
+    if (! $unaliased_path) {
+      throw new Exception("Could not find an unaliased path for '$url' on vsite '$vsite'.");
+    }
+
+    $this->visit("/$vsite/$unaliased_path/delete");
+  }
+
+  /*
+   * Helper function to get node id from Drupal aliased URL
+   */
+  private function _getNodeIdOfUrl($url) {
+
+    $this->visit($url);
+
+    $a_element = $this->getSession()->getPage()->find('xpath', "//a[contains(@href, '?destination=node/') or contains(@href, 'destination%3Dnode%2F')]");
+    $page = $this->getSession()->getPage()->getContent();
+
+    if ($a_element) {
+      $href_unaliased = $a_element->getAttribute('href');
+
+      if (preg_match("/\bnode(?:\%2f|\/)(\d+)/i", $href_unaliased, $matches)) {
+        if (isset($matches[1])) {
+          $nid = (int)($matches[1]);
+          return $nid;
+        }
+      }
+    }
+  }
+
+  /**
+   *
+   * @When /^I visit the "([^"]*)" form for node "([^"]*)" in site "([^"]*)"
+   */
+  public function iVisitTheXFormForNodeYinSiteZ($form, $url, $vsite) {
+    $path = $this->_getUnaliasedPathFromAliasPath($url, $vsite);
+    if (! $path) {
+      throw new Exception("Could not find an unaliased path for '$url' on vsite '$vsite'.");
+    }
+    $this->visit("$path/$form");
+  }
+
+  /**
+   * @When /^I intentionally throw some javascript errors$/
+   */
+  public function iIntentionallyThrowSomeJsErrors() {
+    $BehatConsoleErrorsScript = "
+    (function () {
+      if (!window.BehatScriptRun) {
+        window.BehatScriptRun = true;
+        window.BehatConsoleErrors = [];
+
+        window.onerror = function (error, url, line) {
+          BehatConsoleErrors.push({error: error, url: url, line: line});
+        }
+      }
+    })();
+    ";
+
+    $errorCausingScripts = array(
+      "var abc = xyz.ThisPropertyDoesNotExist.NorDoesThisOne;",
+      "throw new Error('Something bad happened.');",
+    );
+
+    foreach ($errorCausingScripts as $s) {
+      $this->getSession()->executeScript($s);
+      $this->getSession()->executeScript($BehatConsoleErrors);
+      if ($jserrors = $this->getSession()->evaluateScript("return window.BehatConsoleErrors")) {
+        print_r($jserrors);
+      }
+    }
+  }
+
+  /**
+   * @When /^I visit the unaliased registration path of "([^"]*)" on vsite "([^"]*)" and append "([^"]*)"$/
+   */
+  public function iVisitTheUnaliasedRegistrationPathOfAndAppend($url, $vsite, $appendage) {
+    $unaliased_path = drupal_lookup_path('source', $url);
+
+    # Check the url with the vsite prepended
+    if (! $unaliased_path) {
+      $unaliased_path = drupal_lookup_path('source', "$vsite/$url");
+    }
+
+    if (! $unaliased_path) {
+      throw new Exception("Could not find an unaliased path for '$url' on vsite '$vsite' with '$appendage' appended.");
+    }
+
+    if (preg_match('/node\/(\d+)/', $unaliased_path, $matches)) {
+      if (isset($matches[1])) {
+        $nid = $matches[1];
+      }
+    }
+
+    if (! isset($nid)) {
+      throw new Exception("Could not find a node ID via drupal_lookup_path(): $unaliased_path");
+    }
+
+    $this->visit("$vsite/os_events/nojs/registration/$nid/$appendage");
+  }
+  /**
+   *
+   * @Then /^I should see "([^"]*)" events named "([^"]*)" over the next "([^"]*)" pages$/
+   *
+   */
+  public function iShouldSeeNEventsNamedXyzOverTheNextNDateUnits($num_events, $event_title, $num_intervals) {
+
+    $num_events_counted = 0;
+
+    $counter = 0;
+    while ($counter++ <= $num_intervals) {
+      $num_events_counted +=
+        count($this->getSession()->getPage()->findAll('xpath',
+          "//div[@class='calendar-calendar']//td[starts-with(@id, 'os_events-')]//span[@class='field-content']/a[text()='$event_title']"));
+
+      $page = $this->getSession()->getPage()->getContent();
+      $date_next_arrow = $this->getSession()->getPage()->find('xpath', "//section[@id='main-content']//li[@class='date-next']/a");
+      $date_next_arrow->click();
+    }
+
+    $counter = 0;
+    if ($num_events_counted == (int)$num_events) {
+
+      # Return to today's calendar page
+      while ($counter++ <= $num_intervals) {
+        $date_prev_arrow = $this->getSession()->getPage()->find('xpath', "//section[@id='main-content']//li[@class='date-prev']/a");
+        $date_prev_arrow->click();
+      }
+      return true;
+    }
+    throw new Exception("Found $num_events_counted events, but expected $num_events.\n");
+  }
+
+  /**
+   *
+   * @Given /^I fill in "([^"]*)" with date interval "([^"]*)" from "([^"]*)"$/
+   *
+   */
+  public function iFillInFieldWithDateInterval($element_id, $date_interval, $start_date) {
+    $now = new DateTime($start_date);
+    $future_date = $now->add(new DateInterval($date_interval))->format("M d Y");
+    return new Step\When("I fill in \"$element_id\" with \"$future_date\"");
+  }
+
+  /**
+   * @Given /^I fill in the "([^"]*)" "([^"]*)" field under "([^"]*)" with date interval "([^"]*)" from "([^"]*)"$/
+   */
+  public function iFillInTheNthFieldBelowXyzWithDateInterval($nth, $field_type, $field_under_text, $date_interval, $start_date) {
+    $element = $this->_getNthFieldBelowXyz($nth, $field_type, $field_under_text);
+    $future_date = $this->_getDateInterval($start_date, $date_interval);
+    $element->setValue($future_date);
+  }
+
+  /**
+   * @Given /^I fill in the "([^"]*)" "([^"]*)" field above the "([^"]*)" "([^"]*)" with date interval "([^"]*)" from "([^"]*)"$/
+   */
+  public function iFillInTheNthFieldAboveXyzWithDateInterval($nth, $field_type1, $field_under_text, $field_type2, $date_interval, $start_date) {
+    $element = $this->_getNthFieldAboveXyz($nth, $field_type1, $field_under_text, $field_type2);
+    $future_date = $this->_getDateInterval($start_date, $date_interval);
+    $element->setValue($future_date);
+  }
+
+  /**
+   * @Given /^I fill in the "([^"]*)" "([^"]*)" field within the "([^"]*)" section with date interval "([^"]*)" from "([^"]*)"$/
+   */
+  public function iFillInTheNthFieldWithinXyzWithDateInterval($nth, $field_type1, $field_within_text, $date_interval, $start_date) {
+    $element = $this->_getNthFieldWithinXyz($nth, $field_type1, $field_within_text, $field_type2);
+    $future_date = $this->_getDateInterval($start_date, $date_interval);
+    $element->setValue($future_date);
+  }
+
+  /*
+   * Helper function to convert ordinal number (nth) to cardinal number (n)
+   */
+  private function _ordinal_to_cardinal($nth) {
+    $nth_index = preg_replace("/(st|nd|th)/i", "", $nth);
+
+    if (! preg_match("/\d+/", $nth_index)) {
+      throw new Exception("Expected an ordinal number, e.g., 1st, 22nd, 1457th), but did not find one.");
+    }
+
+    return (int)$nth_index - 1;
+  }
+
+  /**
+   * Helper function to get an input element under a div label
+   */
+  private function _getNthFieldBelowXyz($nth, $field_type, $field_under_text) {
+    $page = $this->getSession()->getPage();
+    $nth_index = $this->_ordinal_to_cardinal($nth);
+    $xpath_expr = "//label[contains(text(), '$field_under_text')]/..//input[@type='$field_type']";
+    $elements = $page->findAll('xpath', $xpath_expr);
+
+    if (isset($elements[$nth_index])) {
+      return $elements[$nth_index];
+    } else {
+      throw new Exception("XPath expression not found at the $nth index: '$xpath_expr'.");
+    }
+  }
+
+  /**
+   * Helper function to get an input element within a div label
+   */
+  private function _getNthFieldWithinXyz($nth, $field_type, $field_within_text) {
+    $page = $this->getSession()->getPage();
+    $nth_index = $this->_ordinal_to_cardinal($nth);
+    $xpath_expr = "//label[contains(text(), '$field_within_text')]/../input[@type='$field_type']";
+    $elements = $page->findAll('xpath', $xpath_expr);
+
+    if (isset($elements[$nth_index])) {
+      return $elements[$nth_index];
+    } else {
+      throw new Exception("XPath expression not found at the $nth index: '$xpath_expr'.");
+    }
+  }
+
+  /**
+   * Helper function to get an input element above another element
+   */
+  private function _getNthFieldAboveXyz($nth, $field_type1, $field_above_text, $field_type2) {
+    $page = $this->getSession()->getPage();
+    $nth_index = $this->_ordinal_to_cardinal($nth);
+    $xpath_expr = "//input[@type='$field_type2'][@value='$field_above_text']/..//input[@type='$field_type1']";
+    $elements = $page->findAll('xpath', $xpath_expr);
+
+    if (isset($elements[$nth_index])) {
+      return $elements[$nth_index];
+    } else {
+      throw new Exception("XPath expression not found at the $nth index: '$xpath_expr'.");
+    }
+  }
+
+  /**
+   * @Then /^I should "([^"]*)" event named "([^"]*)" on date "([^"]*)" from "([^"]*)" over the next "([^"]*)" pages$/
+   */
+  public function iShouldSeeTheEventNamedOnDateIntervalFrom($see_or_not, $event_name, $date_interval, $start_date, $num_intervals) {
+
+    $counter = 0;
+    $success = false;
+    while ($counter++ <= $num_intervals) {
+      $page = $this->getSession()->getPage()->getContent();
+      $future_date = $this->_getDateInterval($start_date, $date_interval);
+      $xpath_expr =  "//td[@id='os_events-$future_date-0']//a[text()='$event_name']";
+      $event_on_date = $this->getSession()->getPage()->findAll('xpath', $xpath_expr);
+
+      switch($see_or_not) {
+        case "see":
+          if ($event_on_date) {
+            $success = true;
+            break;
+          }
+          $msg = "The event '$event_name' was not seen on '$future_date', but should have been there.";
+        case "not see":
+          if (! $event_on_date) {
+            $success = true;
+            break;
+          }
+          $msg = "The event '$event_name' was seen on '$future_date', but should not have been there.";
+        default:
+          throw new Exception("Invalid parameter.  Expected 'I should \"see\" ...' or 'I should \"not see\" ...'.");
+      }
+    }
+
+    if (! $success) {
+      throw new Exception($msg);
+    }
+
+    # Return calendar to home month
+    $counter = 0;
+    while ($counter++ <= $num_intervals) {
+      $date_prev_arrow = $this->getSession()->getPage()->find('xpath', "//li[@class='date-prev']/a");
+      $date_prev_arrow->click();
+    }
+  }
+
+  /*
+   * Helper function to perform a date increment, and return a date string 
+  */
+  private function _getDateInterval($start_date = "now", $date_interval) {
+    $now = new DateTime($start_date);
+    $future_date = $now->add(new DateInterval($date_interval))->format("M d Y");
+    return $future_date;
+  }
+
+  /**
+   *
+   * @Given /^I select the radio button On Until Date E.g., "([^"]*)" with the id "([^"]*)"$/
+   *
+   */
+  public function iSelectTheRadioButtonOnUntilDateMdyWithTheId($eg_date_format, $element_id) {
+    $now = new DateTime();
+    return new Step\When('I select the radio button "On Until Date E.g., ' . $now->format($eg_date_format) . '" with the id "' . $element_id . '"');
+  }
+
+  /**
+   *
+   * @Given /^I focus on "([^"]*)" element "([^"]*)", and press key "([^"]*)"$/
+   *
+   */
+  public function iFocusOnElementAndPressKey($type, $expr, $char) {
+    $elem = $this->getSession()->getPage()->find($type, $expr);
+    $elem->focus();
+    $this->getSession()->getDriver()->keyDown($expr, $char);
+    $this->getSession()->getDriver()->keyUp($expr, $char);
+  }
+
+  /**
+   *
+   * @Given /^I focus on "([^"]*)" element "([^"]*)"$/
+   *
+   */
+  public function iFocusOnElement($type, $expr) {
+    $elem = $this->getSession()->getPage()->find($type, $expr);
+    $elem->focus();
+  }
+
+  /**
+   * @When /^I click the gear icon in the content region$/
+   */
+  public function iClickTheGearIconInTheContentRegion() {
+    list ($content_region, $gear_icon, $gear_icon_trigger_link) = $this->_getGearIconInContentRegion();
+
+    $content_region->mouseOver();
+    $content_region->click();
+    $gear_icon->mouseOver();
+    $gear_icon->click();
+    $gear_icon_trigger_link->mouseOver();
+    $gear_icon_trigger_link->click();
+  }
+
+  /**
+   * @When /^I click the gear icon in the node content region$/
+   */
+  public function iClickTheGearIconInTheNodeContentRegion() {
+    $content_region = $this->getSession()->getPage()->find('xpath', "//div[@class='node-content']");
+    $gear_icon = $this->getSession()->getPage()->find('xpath', "//div[@class='contextual-links-wrapper contextual-links-processed']");
+    $gear_icon_trigger_link = $this->getSession()->getPage()->find('xpath', "//div[@id='content']//div/a[text()='Configure']");
+
+    $content_region->mouseOver();
+    $content_region->click();
+    $gear_icon->mouseOver();
+    $gear_icon->click();
+    $gear_icon_trigger_link->mouseOver();
+    $gear_icon_trigger_link->click();
+  }
+  /**
+   * @When /^I should "([^"]*)" see the "([^"]*)" menu item in the gear menu$/
+   */
+  public function iDoNotSeeTheMenuItemUnderTheGearMenu($negation, $menu_label) {
+    list ($content_region, $gear_icon, $gear_icon_trigger_link) = $this->_getGearIconInContentRegion();
+
+    if (! $gear_icon) {
+      return;
+    }
+
+    $gear_menu_item = $this->getSession()->getPage()->find('xpath', "//div[@class='contextual-links-wrapper contextual-links-processed']/ul/li/a[text()='$menu_label']");
+
+    if ($negation) {
+      if (! $gear_menu_item) {
+        return;
+      } else {
+        throw new Exception("Found menu item '$menu_label', but should not have.");
+      }
+    }
+  }
+
+  private function _getGearIconInContentRegion() {
+    $content_region = $this->getSession()->getPage()->find('xpath', "//div[@id='content']");
+    $gear_icon = $this->getSession()->getPage()->find('xpath', "//div[@class='contextual-links-wrapper contextual-links-processed']");
+    $gear_icon_trigger_link = $this->getSession()->getPage()->find('xpath', "//div[@id='content']//div/a[text()='Configure']");
+
+    return array($content_region, $gear_icon, $gear_icon_trigger_link);
+  }
+
+  /**
+   * @Given /^I visit the "([^"]*)" parameter in the current query string with "([^"]*)" appended on vsite "([^"]*)"$/
+   */
+  public function iVisitTheParameterInTheCurrentQueryString($parameter, $appendage, $vsite) {
+
+    $url = $this->getSession()->getCurrentUrl();
+    if (preg_match("/$parameter(?:=|%3d)(\S+)/i", $url, $matches)) {
+
+      if (isset($matches[1])) {
+        $this->getSession()->visit($this->locatePath((($vsite) ? "/$vsite/" : "") . rawurldecode($matches[1]) . (($appendage) ? "/$appendage" : "")));
+      } else {
+        throw new Exception("Could not get a $parameter.\n");
+      }
+    }
+  }
+
+
+  /**
+   * @Given /^I click "([^"]*)" in the gear menu$/
+   */
+  public function iClickInTheGearMenu($menu_item) {
+    $gear_menu_item = $this->getSession()->getPage()->find('xpath', "//div[@id='content']//div/a[text()='Configure']/..//a[text()='$menu_item']");
+    $gear_menu_item->click();
+  }
+
+  /**
+   * @Given /^I click "([^"]*)" in the gear menu in node content$/
+   */
+  public function iClickInTheGearMenuNodeContent($menu_item) {
+    $gear_menu_item = $this->getSession()->getPage()->find('xpath', "//div[@class='node-content']//div[@class='contextual-links-wrapper contextual-links-processed contextual-links-active']/..//a[text()='$menu_item']");
+    try {
+      $gear_menu_item->click();
+    }
+    catch (Exception $e) {
+      throw new Exception($menu_item . " is not clickable");
+    }
+  }
+
+
+  /**
+   * @When /^I swap the order of the first two items in the outline on vsite "([^"]*)"$/
+   */
+  public function iSwapTheOrderOfTheBookOutline($vsite) {
+    $this->iClickTheGearIconInTheContentRegion();
+    $this->iClickInTheGearMenu("Outline");
+    $this->iVisitTheParameterInTheCurrentQueryString("destination", "outline", $vsite);
+
+    $handles = $this->getSession()->getPage()->findAll('xpath', "//div[@class='handle']");
+
+    if (sizeof($handles) > 1) {
+      $handles[0]->dragTo($handles[1]);
+    } else {
+      throw new Exception("There needs to be at least two book entries to test re-ordering.\n");
+    }
+
+    return array(
+      new Step\When('I press "Save Booklet Outline"'),
+    );
+  }
+
+  /**
+   * @Given /^I visit the parent directory of the current URL$/
+   */
+  public function iVisitParentDirectory() {
+    $url = $this->getSession()->getCurrentUrl();
+    $this->getSession()->visit($this->locatePath($url . '/..'));
+  }
+
+  /**
+   * @Then /^I should see breadcrumb "([^"]*)"$/
+   *
+   */
+  public function iShouldSeeBreadcrumb($breadcrumb) {
+
+    $page = $this->getSession()->getPage()->getContent();
+
+    # Ignore HTML tags between breadcrumb separators
+    $breadcrumb_pattern = preg_replace("/\s+\/\s+/", ".*\/.*", $breadcrumb);
+
+    if (preg_match("/$breadcrumb_pattern/", $page)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * @When /^I edit the media element "([^"]*)"$/
+   */
+  public function iClickToEditTheMedia($filename) {
+    $fid = FeatureHelp::getEntityID('file', $filename);
+    $file = file_load($fid);
+    return array(
+      new Step\When('I visit "john/file/' . $fid . '/edit"'),
+    );
+  }
+
+  /**
+   * @Then /^I should see disqus$/
+   */
+  public function iShouldSeeDisqus() {
+
+    $page = $this->getSession()->getPage()->getContent();
+    $element = $this->getSession()->getPage()->find('css', "div#disqus_thread");
+
+    if ($element) {
+      return;
+    }
+
+    throw new Exception("Did not find disqus panel.\n");
+  }
+
+  /**
+   * @Given /^I add a existing sub page named "([^"]*)" under the page "([^"]*)"$/
+   */
+  public function iAddExistingSubPageUnderPage($child_title, $parent_title) {
+    $nid = FeatureHelp::getNodeId($parent_title);
+    return array(
+      new Step\When('I visit "john/os/pages/' . $nid . '/subpage' . '"'),
+    );
+  }
+
+  /**
+   * @When /^I visit the file "([^"]*)"$/
+   */
+  public function iVisitTheFile($filename) {
+    $fid = FeatureHelp::getEntityID('file', $filename);
+    return array(
+      new Step\When('I visit "john/file/' . $fid . '"'),
+    );
+  }
+    /**
+   * @When /^I delete the media element "([^"]*)"$/
+   */
+  public function iClickToDeleteTheMedia($filename) {
+    $fid = FeatureHelp::getEntityID('file', $filename);
+    $file = file_load($fid);
+    return array(
+      new Step\When('I visit "john/file/' . $fid . '/delete"'),
+      new Step\When('I press "Delete"'),
+    );
+  }
+
+  /**
+   * @Given /^I fill in the field "([^"]*)" with the page "([^"]*)"$/
+   *
+   * This step is used to fill in an autocomplete field.
+   */
+  public function iFillInTheFieldWithThePage($id, $title) {
+    $nid = FeatureHelp::getNodeId($title);
+    $element = $this->getSession()->getPage();
+    $value = $title . ' [' . $nid . ']';
+    $element->fillField($id, $value);
+  }
+
+  /**
+   * @When /^I click the gear icon in the section navigation widget$/
+   */
+  public function iClickTheGearIconInTheSectionNavigation() {
+    $content_region = $this->getSession()->getPage()->find('xpath', "//div[@id='block-boxes-os-pages-section-nav']");
+    $gear_icon = $this->getSession()->getPage()->find('xpath', "//div[@class='contextual-links-wrapper contextual-links-processed']");
+    $gear_icon_trigger_link = $this->getSession()->getPage()->find('xpath', "//div[@id='block-boxes-os-pages-section-nav']//div/a[text()='Configure']");
+
+    $content_region->mouseOver();
+    $content_region->click();
+    $gear_icon->mouseOver();
+    $gear_icon->click();
+    $gear_icon_trigger_link->mouseOver();
+    $gear_icon_trigger_link->click();
+  }
+
+  /**
+   * @Given /^I visit the "([^"]*)" parameter in the current page query string with "([^"]*)" appended on vsite "([^"]*)"$/
+   */
+  public function iVisitTheParameterInTheCurrentPageQueryString($parameter, $appendage, $vsite) {
+
+    $url = $this->getSession()->getCurrentUrl();
+    if (preg_match("/$parameter(?:=|%3d)node\/(\S+)/i", $url, $matches)) {
+
+      if (isset($matches[1])) {
+        $this->getSession()->visit($this->locatePath((($vsite) ? "/$vsite/os/pages/" : "") . rawurldecode($matches[1]) . (($appendage) ? "/$appendage" : "")));
+      } else {
+        throw new Exception("Could not get a $parameter.\n");
+      }
+    }
+  }
+
+  /**
+   * @Given /^I click "([^"]*)" in the gear menu of section navigation$/
+   */
+  public function iClickInTheGearMenuOfSectionNav($menu_item) {
+    $gear_menu_item = $this->getSession()->getPage()->find('xpath', "//div[@id='block-boxes-os-pages-section-nav']//div/a[text()='Configure']/..//a[text()='$menu_item']");
+    $gear_menu_item->click();
+  }
+
+  /**
+   * @When /^I swap the order of the subpages under the page "([^"]*)"$/
+   */
+  public function iSwapTheOrderOfTheSubpage($page_title) {
+    $nid = FeatureHelp::getNodeId($page_title);
+    $this->Visit('john/os/pages/' . $nid . '/outline');
+    $this->adminPanelClosed();
+
+    $handles = $this->getSession()->getPage()->findAll('xpath', "//div[@class='handle']");
+
+    if (sizeof($handles) > 1) {
+      $handles[0]->dragTo($handles[1]);
+    } else {
+      throw new Exception("There needs to be at least two subpage entries to test re-ordering.\n");
+    }
+
+    return array(
+      new Step\When('I press "Save Section Outline"'),
+    );
+  }
+
+  /**
+   * @When /^I click on "([^"]*)" button in the wysiwyg editor$/
+   */
+  public function iClickOnEditor($class) {
+    $element = $this->getSession()->getPage()->find('xpath', "//*[contains(@class, '{$class}')]");
+    $element->click();
+  }
+ 
+  /**
+   * @When /^I visit the absolute path "([^"]*)"$/
+   */
+  public function iVisitTheAbsolutePath($path) {
+    $this->getSession()->visit($path);
+    $content = $this->getSession()->getPage()->getContent();
+    var_dump($content);
+  }
 }

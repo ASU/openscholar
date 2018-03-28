@@ -20,7 +20,7 @@ function os_search_solr_boxes_plugins() {
   );
 
   $plugins['os_search_solr_search_box'] = array(
-    'title' => t('Search box'),
+    'title' => t('Filtered search'),
     'tags' => array('Content'),
     'handler' => array(
       'class' => 'os_search_solr_search_box',
@@ -145,9 +145,14 @@ function os_search_solr_apachesolr_query_alter(DrupalSolrQueryInterface $query) 
 
     // There may be private features, this user is a member and should get access to private features in search.
     if ($query->hasFilter('bs_private', 1, TRUE) && (user_access('administer group') || og_is_member('node', $group_wrapper->getIdentifier()))) {
-       $query->removeFilter('bs_private');
+      $query->removeFilter('bs_private');
     }
-  }
+
+    // Bundles which belong for disabled apps should appear in the search.
+    if ($bundles = array_keys(os_get_bundles(array(OS_DISABLED_APP)))) {
+      $query->addFilter('bundle', '(' . implode(' OR ', $bundles) . ')', TRUE);
+    }
+ }
   elseif (variable_get('file_default_scheme', 'public') == 'private') {
     // We are not in a vsite, and we are in a private install.
     drupal_access_denied();
@@ -158,6 +163,7 @@ function os_search_solr_apachesolr_query_alter(DrupalSolrQueryInterface $query) 
     // Limit searches to just this OpenScholar install in shared indexes.
     $query->addFilter('hash', apachesolr_site_hash());
   }
+
 }
 
 /**
@@ -248,7 +254,20 @@ function os_search_solr_block_view_alter(&$data, $block) {
   if ($block->delta == $delta) {
     $data['title'] = t('Filter By Taxonomy');
   }
+}
 
+/**
+ * Shortens the Info field for Facetapi widgets
+ */
+function os_search_solr_os_widget_alter(&$block) {
+  if ($block['module'] == 'facetapi') {
+    if (isset($block['info'])) {
+      $matches = array();
+      if (preg_match('|Facet API: Apache Solr environment: [a-zA-Z ]*: ([a-zA-Z0-9 ]*)|', $block['info'], $matches)) {
+        $block['info'] = 'Faceted Search: Filter by '.$matches[1];
+      }
+    }
+  }
 }
 
 /**
@@ -663,6 +682,15 @@ function os_search_solr_reindex_site() {
   $vsite = vsite_get_vsite();
   os_search_solr_add_vsite_to_reindex($vsite->id);
   drupal_set_message(t('Site marked for indexing. It may take a few minutes until the site is fully indexed.'));
+  return array(
+    array('type' => 'no_close'),
+    array('type' => 'no_reload'),
+    array(
+      'type' => 'message',
+      'message_type' => 'status',
+      'message' => t('Site marked for indexing. It may take a few minutes until the site is fully indexed.'),
+    )
+  );
 }
 
 /**
@@ -1272,5 +1300,87 @@ function os_search_solr_change_search_path($form, $form_state) {
   }
 
   // Collect terms.
-  drupal_goto('search/site/' . $form_state['values']['search_block_form'], $options);
+  _os_search_solr_custom_404_redirect('search/site/' . $form_state['input']['search_block_form'], $options);
+}
+
+/**
+ * Custom funtion for Search Box
+ * 404_page
+ */
+function _os_search_solr_custom_404_redirect($path = '', array $options = array(), $http_response_code = 302) {
+  if ($path === current_path() && empty($options['external']) && url_is_external($path)) {
+    // Force url() to generate a non-external URL.
+    $options['external'] = FALSE;
+  }
+
+  drupal_alter('drupal_goto', $path, $options, $http_response_code);
+  // The 'Location' HTTP header must be absolute.
+  $options['absolute'] = TRUE;
+  $url = url($path, $options);
+  header('Location: ' . $url, TRUE, $http_response_code);
+  drupal_exit($url);
+}
+
+/**
+ * Implements hook_forms().
+ */
+function os_search_solr_forms($form_id, $args) {
+  $forms = array();
+
+  if (strpos($form_id, 'os_solr_search_box') === 0) {
+    list(, $delta) = explode('___', $form_id);
+    $forms[$form_id] = array(
+      'callback' => 'os_search_solr_search_box',
+      'callback arguments' => array($delta),
+    );
+  }
+
+  return $forms;
+}
+
+/**
+ * Form callback; Return the original search box for duplicate search widgets.
+ */
+function os_search_solr_search_box($form, $form_state) {
+  $form = drupal_build_form('search_block_form', $form_state);
+
+  // Removing the original submit handler due to:
+  // 1. We don't need it any more. The submit handler will redirect the user to
+  // the right place.
+  // 2. The submit handler looks for a key that doesn't exists. Removing it will
+  // prevent the errors.
+  $key = array_search('search_box_form_submit', $form['#submit']);
+  unset($form['#submit'][$key]);
+  return $form;
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function os_search_solr_form_boxes_box_form_alter(&$form, &$form_state) {
+
+  if ($form['plugin_key']['#value'] != 'os_search_solr_search_box') {
+    return;
+  }
+
+  $form['description']['#prefix'] = '<span class="os-search-solr-widget-description">' . t('Display results based on content type and/or taxonomy.') . '</span>';
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function os_search_solr_os_layout_get_alter($context, &$blocks) {
+  // Legacy block replaced with os_search_solr-solr_search_box.
+  $blocks = array_filter($blocks, function ($item) {
+
+    if ($item['module'] == 'os_search_solr' && $item['delta'] == 'solr_search_box') {
+      return FALSE;
+    }
+
+    if ($item['delta'] != 'site-search') {
+      return TRUE;
+    }
+
+    return FALSE;
+  });
 }

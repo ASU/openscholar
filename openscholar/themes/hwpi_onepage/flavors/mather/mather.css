@@ -59,6 +59,8 @@ h1#page-title {
     background-color: #fff;
 }
 #menu-bar ul.nice-menu ul,
+.search-block-form input.form-submit,
+.search-block-form #edit-submit,
 #search-block-form input.form-submit,
 #search-block-form #edit-submit,
 #search-form #edit-submit,
@@ -125,9 +127,7 @@ h1#page-title {
 #footer {
     border-top: 1px solid #ddd;
 }
-.cal-export {
-    background-position: 58px -956px;
-}
+
 #footer .footer-login:after {
     background-image: none;
 }

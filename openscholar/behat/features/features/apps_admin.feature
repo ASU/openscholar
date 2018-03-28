@@ -8,35 +8,34 @@ Feature:
       And I visit "john"
       And I make sure admin panel is open
       And I open the admin panel to "Settings"
-     When I click "Enable / Disable Apps"
+     When I click on the "Enable / Disable Apps" control
       #And I should see "Apps"
-     Then I should see the "spaces" table with the following <contents>:
-      | Blog          | Public |
-      | Booklets      | Public |
-      | Classes       | Public |
-      | Dataverse     | Public |
-      | Events        | Public |
-      | Image Gallery | Public |
-      | Links         | Public |
-      | News          | Public |
-      | Basic Pages   | Public |
-      | Presentations | Public |
-      | Profiles      | Public |
-      | Publications  | Public |
-      | Reader        | Public |
-      | Software      | Public |
+     Then I should see the "apps-table" table with the following <contents>:
+      | Blog          | Everyone |
+      | Booklets      | Everyone |
+      | Classes       | Everyone |
+      | Events        | Everyone |
+      | Media Gallery | Everyone |
+      | Links         | Everyone |
+      | News          | Everyone |
+      | Basic Pages   | Everyone |
+      | Presentations | Everyone |
+      | Profiles      | Everyone |
+      | Publications  | Everyone |
+      | Reader        | Everyone |
+      | Software      | Everyone |
 
   @api @features_first @javascript
     Scenario: Check site owner can't manage permissions of disabled app.
       Given I am logging in as "john"
-        And I set feature "edit-os-booklets" to "Disabled" on "john"
+        And I set feature "Booklets" to "Disabled" on "john"
        When I visit "john/cp/users/permissions"
        Then I should not see "Create book page content"
 
   @api @features_first @javascript
     Scenario: Check enabling app brings back its permissions.
       Given I am logging in as "john"
-        And I set feature "edit-os-booklets" to "Public" on "john"
+        And I set feature "Booklets" to "Public" on "john"
        When I visit "john/cp/users/permissions"
        Then I should see "Create book page content"
 
@@ -44,8 +43,7 @@ Feature:
     Scenario: Check content editor can edit widgets by default
       Given I am logging in as "john"
        When I give the user "klark" the role "content editor" in the group "john"
-        And I open the user menu
-        And I click "Logout"
+        And I visit "john/user/logout"
         And I am logging in as "klark"
         And I go to "john/os/widget/boxes/os_addthis/edit"
        Then I should see "AddThis" in an "h1" element

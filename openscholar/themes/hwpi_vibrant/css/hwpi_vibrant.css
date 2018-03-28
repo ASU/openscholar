@@ -132,6 +132,12 @@ div.contextual-links-wrapper a,.contextual-controls-wrapper div.ctools-dropdown.
 #boxes-box-site_info,#boxes-box-site_info a {
     color: #303030;
 }
+#boxes-box-site_info h2 {
+    font-size: 20px;
+}
+#boxes-box-site_info {
+    line-height: 1;
+}
 #menu-bar {
     background: #e8e8e8;
     padding: 0 0 30px;
@@ -234,8 +240,10 @@ ul.nice-menu-down li ul li ul {
 #page-title,.node-title,.page-search .title a,#content-column .block.block-boxes-os_boxes_manual_list .links.inline a,.more-link,.page-search #content-column p,.links a,#footer ul.menu a,.boxes-box-content h2,.view-os-events .views-field-colorbox,.field-name-body h2,.field-name-body h3,.field-name-body h4 {
     font-family: Arial, Helvetica, sans-serif;
 }
-.not-front .field-name-body,#content-column p,
-.cke_editable * {
+.not-front .field-name-body,
+#content-column p,
+.cke_editable *,
+#content-column li {
     font-family: georgia;
 }
 
@@ -509,7 +517,7 @@ table td.mini {
     border-radius: 3px;
 }
 table td.mini .mini-day-on a {
-    color: #FFF;
+    color: #FFF !important;
 }
 .event-start .event-start {
     background: #F8F8F8;

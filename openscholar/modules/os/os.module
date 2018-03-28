@@ -147,7 +147,7 @@ function os_menu() {
     'title' => '',
     'page callback' => 'os_session_destroy',
     'access arguments' => array('access content'),
-  ); 
+  );
 
   return $items;
 }
@@ -188,9 +188,6 @@ function os_menu_alter(&$items) {
   $items['user/autocomplete']['access arguments'] = array(
     'access user autocomplete',
   );
-
-  // Apply CP theme for book revision page.
-  $items['node/%node/revisions']['theme callback'] = 'cp_theme_name';
 }
 
 function os_in_readonly_mode($page) {
@@ -282,14 +279,14 @@ function os_entity_info_alter(&$info) {
   );
 
   // Remove field replacement for entities that don't need it
-  if (!empty($entity_info['file']['field replacement'])) {
-    unset($entity_info['file']['field replacement']);
+  if (!empty($info['file']['field replacement'])) {
+    unset($info['file']['field replacement']);
   }
-  if (!empty($entity_info['taxonomy_term']['field replacement'])) {
-    unset($entity_info['taxonomy_term']['field replacement']);
+  if (!empty($info['taxonomy_term']['field replacement'])) {
+    unset($info['taxonomy_term']['field replacement']);
   }
-  if (!empty($entity_info['comment']['field replacement'])) {
-    unset($entity_info['comment']['field replacement']);
+  if (!empty($info['comment']['field replacement'])) {
+    unset($info['comment']['field replacement']);
   }
 }
 
@@ -677,6 +674,9 @@ function os_process_node(&$vars) {
   }
   $body_shortened = (bool)(strlen($body_full) > strlen($body_display));
 
+  // Remove title attribute to improve screen reader accessibility
+  unset($link['attributes']['title']);
+
   // Checks if there is a break tag inserted at the end of the content.
   // If this is the case, there is no need to add a "read more" link.
   $trailing_break_tag = FALSE;
@@ -685,7 +685,7 @@ function os_process_node(&$vars) {
   // 1. There is a break tag in the body.
   // 2. There is HTML text after the break tag.
   if (isset($split_break_tag[1])) {
-    $text_after_break = strip_tags($split_break_tag[1]);
+    $text_after_break = strip_tags($split_break_tag[1], '<img><iframe><embed><object><param>');
     $trailing_break_tag = (bool) strlen($text_after_break) == 0;
   }
 
@@ -744,6 +744,8 @@ function _os_process_node_links_comment_add_class(&$vars) {
 function os_preprocess_page(&$vars) {
   global $user;
 
+  drupal_add_js(drupal_get_path('module', 'os') . '/js/responsive_menu.js');
+
   // Session timeout checking will be only for logged in users.
   if ($user->uid) {
     // Obtaining session lifetime value from php configuration.
@@ -760,7 +762,7 @@ function os_preprocess_page(&$vars) {
 
   // Add the dismiss messages JS.
   drupal_add_js(drupal_get_path('module', 'os') . "/theme/os_dismiss.js", "file");
-  // Add JS to initialize window.tinyMCEPreInit object before tinymce loading to work with static domain. 
+  // Add JS to initialize window.tinyMCEPreInit object before tinymce loading to work with static domain.
   drupal_add_js(drupal_get_path('module', 'os') . "/js/os_tinymce_init.js", "file");
 
   // Add the dismiss messages CSS.
@@ -877,7 +879,19 @@ function os_preprocess_page(&$vars) {
       ),
     );
   }
-  
+
+  // Ensure "Import" is always the last item in the menu
+  usort($links,
+    function ($a, $b) {
+      if (isset($a["title"]) && (($a["title"] == 'Import') || ($a["title"] == 'Sync'))) {
+        return 1;
+      } else if (isset($b["title"]) &&  (($a["title"] == 'Import') || ($a["title"] == 'Sync'))) {
+        return -1;
+      } else {
+        return 0;
+      }
+    }
+  );
 
   if (count($links) > 1) {
     $vars['title_suffix']['controls']['add_new'] = array(
@@ -1016,7 +1030,7 @@ function os_form_alter(&$form, &$form_state, $form_id) {
       $_GET['destination'] = $paths[$form['#node']->type];
     }
   }
-  
+
   // Add a cancel link to node forms.
   if (strpos($form_id, '_node_form')) {
     if (!empty($_GET['destination'])) {
@@ -1100,10 +1114,6 @@ function os_form_node_form_alter(&$form, $form_state) {
   // Removes "Promoted to front page" checkbox.
   unset($form['options']['promote']);
 
-  // Removes "Revision information" fieldset.
-  $form['revision_information']['#access'] = FALSE;
-
-
   $form['path']['pathauto']['#description'] = t('Uncheck this to create a custom alias below.');
   if (isset($form['field_upload']['und']['add_more']['#value'])) {
     $form['field_upload']['und']['add_more']['#value'] = t('Add media');
@@ -1115,7 +1125,10 @@ function os_form_node_form_alter(&$form, $form_state) {
   unset($form['additional_settings']);
   foreach (element_children($form) as $c) {
     if (isset($form[$c]['#type']) && $form[$c]['#type'] == 'fieldset' && isset($form[$c]['#group'])) {
-      $form[$c]['#collapsed'] = true;
+      // exception to collapsed settings for fieldsets
+      if ($c != "revision_information") {
+        $form[$c]['#collapsed'] = true;
+      }
     }
     unset($form[$c]['#group']);
   }
@@ -1334,7 +1347,7 @@ function os_date_formats() {
     ),
     array(
       'type' => 'os_date_abbreviated',
-      'format' => 'M j, g:ia',
+      'format' => 'D M j, g:ia',
     ),
     array(
       'type' => 'os_date',
@@ -1592,6 +1605,15 @@ function _os_conditional_css_browsers($cond) {
  */
 function os_system_info_alter(&$info, $file, $type) {
   if ($type != 'theme') {
+    if ($file->name == 'os') {
+      // Ignore all autogenerated og_group_ref fields
+      $types = array_keys(os_get_bundles(true));  // All OS Nodes
+      foreach ($types as $type) {
+        $info['features_exclude']['field_instance']['node-' . $type . '-og_group_ref'] = 'node-' . $type . '-og_group_ref';
+        $info['features_exclude']['field_instance']['node-' . $type . '-og_vocabulary'] = 'node-' . $type . '-og_vocabulary';
+      }
+    }
+
     return;
   }
 
@@ -1628,7 +1650,14 @@ function os_system_info_alter(&$info, $file, $type) {
  * Rewrites path to add a return destination wherever it is clicked from.
  */
 function os_url_outbound_alter(&$path, &$options, $original) {
-  global $user;
+  global $user, $is_https;
+
+  // Add support for HTTPS
+  if (!empty($options['base_url'])) {
+    $secure = ((!isset($options['https']) && $is_https) || !empty($options['https']));
+    $options['base_url'] = preg_replace('/http[s]?:\/\//i', ($secure ? 'https://' : 'http://'), $options['base_url'], 1);
+  }
+  // End HTTPS
 
   $loop_back_pages = array(
     'user',
@@ -1783,6 +1812,13 @@ function os_node_view_alter(&$build) {
       '#weight' => 1000,
     );
   }
+
+  if ($build['#view_mode'] == 'teaser') {
+    if (!empty($build['#node']->readMoreAdded)) {
+      // We added a read more in another place. Don't add it again.
+      unset($build['links']['node']['#links']['node-readmore']);
+    }
+  }
 }
 
 /**
@@ -1816,21 +1852,16 @@ function os_contextual_links_view_alter(&$element, $items) {
     $link['query']['destination'] = $redirect;
   }
 
-  if (!user_access('view revisions')) {
-    // User can't view revisions.
+  $node = $element['#element']['#node'];
+
+  if (!node_access('update', $node)) {
+    // User doesn't have access to revisions.
     return;
   }
-
-  $node = $element['#element']['#node'];
 
   if (count(node_revision_list($node)) == 1) {
     // Do not display the revisions tab if the node doesn't have any revisions.
     return FALSE;
-  }
-
-  if (!og_moderation_node_revision_access($node)) {
-    // User has no access to the revisions.
-    return;
   }
 
   $element['#links']['node-revisions'] = array(
@@ -2206,47 +2237,33 @@ function os_form_user_login_alter(&$form, $form_state) {
     );
   }
 
-  if (variable_get('os_login_with_email', TRUE)) {    
+  if (variable_get('os_login_with_email', TRUE)) {
     // Add a new validation.
     // Validation function vsite_user_login_validate must run first.
     array_unshift($form['#validate'],'os_user_login_validate');
   }
 
-  // Overriding the text of first button on the login screen.
-  if (isset($form['pin'])) {
-    $query['destination'] = isset($_GET['destination']) ? $_GET['destination'] : 'user';
-    $form['pin']['#markup'] = l('Log in using your Harvard Key', 'user/pin', array('query' => $query));
-  }
-
   // If user login form is overridden by pinserver_authenticate module, then $form['pin-fieldset'] will be initialized from there.
   // $form['name'] and $form['pass'] both will be unset from pinserver_authenticate module
   if (isset($form['pin-fieldset'])) {
-    $form['pin-fieldset']['#title'] = t('Log in with your OpenScholar account');
-    $form['pin-fieldset']['name']['#title'] = t('OpenScholar Username / E-Mail');
+    $form['pin-fieldset']['#title'] = t('Login using your OpenScholar account');
+    $form['pin-fieldset']['name']['#title'] = t('OpenScholar Username or E-Mail');
     $form['pin-fieldset']['pass']['#description'] = t('!request', array('!request' => l('Forgot your password?', 'user/password')));
     $form['pin-fieldset']['pass']['#title'] = "OpenScholar Password";
 
     $form['pin-fieldset']['login'] = array(
         '#type' => 'submit',
-        '#value' => t('Log in'),
+        '#value' => t('Login'),
         '#attributes' => array('class' => array('pin-button-inline')),
     );
-    $form['pin-fieldset']['back'] = array(
-        '#type' => 'button',
-        '#value' => t('Back'),
-        '#suffix' => '</a>',
-        '#attributes' => array(
-            'class' => array('pin-button-inline'),
-            'onclick' => "window.history.back()",
-        ),
-    );
+
 
     unset($form['pin-fieldset']['actions']['submit']);
   }
 
   // If pinserver_authenticate module is not overriding login form, then $form['name'] and $form['pass'] will not be unset.
   if (isset($form['name']) && isset($form['pass'])) {
-    $form['name']['#title'] = t('OpenScholar Username / E-Mail');
+    $form['name']['#title'] = t('OpenScholar Username or E-Mail');
     unset($form['pass']['#description']);
   }
 }
@@ -2479,6 +2496,7 @@ function os_field_default_fields_alter(&$fields) {
  * Make all select fields use Select2.
  */
 function os_field_widget_options_select_form_alter(&$element, &$form_state, $context) {
+  $element['#title'] = html_entity_decode($element['#title'], ENT_QUOTES | ENT_HTML5);
   $element += array(
     '#after_build' => array('os_select2_widget_after_build'),
     '#cardinality' => $context['field']['cardinality'],
@@ -2808,8 +2826,8 @@ function os_drupal_goto_alter(&$path, &$options, &$http_response_code) {
  *    - batch: The number of nodes we need to iterate at once.
  *    - entity: The entity type.
  *    - path: Path for the file contain the classes or the functions.
- *    - query: The class name and funciton to run, by default this is (queryXXXX, Query) 
- *             where xxxx is the number if the update calling the batch. ex.( query7001, Query) 
+ *    - query: The class name and funciton to run, by default this is (queryXXXX, Query)
+ *             where xxxx is the number if the update calling the batch. ex.( query7001, Query)
  */
 function os_set_update_batch(&$sandbox, $info) {
 
@@ -2927,6 +2945,16 @@ function os_preprocess_block(&$vars) {
   // Adding the name of the module and the delta.
   $vars['attributes_array']['module'] = $vars['block']->module;
   $vars['attributes_array']['delta'] = $vars['block']->delta;
+
+  // Add 'slider' CSS class if the display style is set to 'Slide down'
+  if (isset($vars['elements']['#block']->delta) &&
+      isset($vars['elements']['#block']->module) && $vars['elements']['#block']->module == "boxes") {
+    $box = boxes_box_load($vars['elements']['#block']->delta);
+    if (isset($box->options['as_nav']) && $box->options['as_nav'] === "slider") {
+      $vars['classes_array'][] = 'term-slider';
+    }
+  }
+
 }
 
 /**
@@ -3062,7 +3090,7 @@ function os_advagg_save_aggregate_alter(&$files_to_save, $aggregate_settings, $o
   // Defining static variable to be used inside preg_replace callback for search and replace domain strings.
   $replace = &drupal_static('advagg_aggregate_replace');
   $replace = array('domain' => $domain, 'static' => $static);
-  
+
   foreach ($files_to_save as $file_name => $file) {
     $file_info = pathinfo($file_name);
     // For aggregated css files, image paths to be started with static domain, fonts to be used as relative paths.
@@ -3091,7 +3119,7 @@ function _os_advagg_build_css_path($matches) {
   else {
     // Else relative path will be used for font files. starting with "/"
     $path = str_replace($replace['domain'], '', $path);
-  }  
+  }
   return 'url(' . $path . ')';
 }
 
@@ -3114,10 +3142,10 @@ function os_page_build(&$page) {
       $warning_msg = t('Sorry, you are not authorized to access this page.<br/>Please contact the site owner to gain access.');
     }
     else {
-      $warning_msg = t('You are not authorized to access this page.');
-      $warning_msg .= '<br/>' . 'You need to ' . l('log in', 'user/login', array('query' => array('destination' => $redirect['destination']) )) . ' to access this page';
+      $warning_msg = t('This website or page content is accessible to authorized users.');
+      $warning_msg .= ' For access, please ' . l('log in here.', 'user/login', array('query' => array('destination' => $redirect['destination']) ));
     }
-    
+
     $page['content']['system_main']['main']['#markup'] = $warning_msg;
     $main_content_display = TRUE;
   }
@@ -3682,18 +3710,59 @@ function os_field_formatter_view($entity_type, $entity, $field, $instance, $lang
     case 'os_text_trimmed':
 
       foreach ($items as $delta => $item) {
-        $text = text_summary($item['value'], $item['format'], $display['settings']['trim_length']);
-        $delimiter = strpos($item['value'], '<!--break-->');
 
-        // Check the if the text was trimmed and we don't have the break tag.
-        // The break tag will be handled in another place thus give us two
-        // 'Read more' links.
-        if (strlen($item['value']) != strlen($text) && $delimiter === FALSE) {
+        // We will use default views trim text to trim content.Because it works
+        // better in case of first paragrapgh is huge.
+        $alter = array(
+          'html' => TRUE,
+          'max_length' => $display['settings']['trim_length'],
+          'word_boundary' => TRUE,
+          'ellipsis' => TRUE,
+        );
+        $text = views_trim_text($alter, media_filter($item['value']));
+
+        $read_more = function($entity_type, $entity, &$text) {
           $uri = entity_uri($entity_type, $entity);
-          $text .= '… ' . l(t('Read more'), $uri['path']);
-        }
+          $text .= ' ' . l(t('Read more <span class="element-invisible"> about @title</span>', array('@title' => entity_label($entity_type, $entity))), $uri['path'], array('attributes' => array('class' => array('node-readmore')), 'html' => true));
+        };
 
+        // We need to varify if there is any breake tag available in the content
+        // if yes then we will use text summary function to trim texts.
+        $delimiter = strpos($item['safe_value'], '<!--break-->');
+
+        if ($delimiter !== FALSE) {
+          // Checks if there is a break tag inserted at the end of the content.
+          // If this is the case, there is no need to add a "read more" link.
+          $split_break_tag = explode('<!--break-->', $item['safe_value'], 2);
+          // Only checks for a trailing break tag if all the following are true:
+          // 1. There is a break tag in the body.
+          // 2. There is HTML text after the break tag.
+          if (isset($split_break_tag[1])) {
+            $text_after_break = strip_tags(trim($split_break_tag[1]), '<img><iframe><embed><object><param>');
+          }
+          $text = text_summary($item['safe_value'], $item['format'], $display['settings']['trim_length']);
+          if (!empty(drupal_strlen($text_after_break))) {
+            $text = htmlentities($text);
+            // Remove non breaking spaces (e.g &nbsp;) from the start and end
+            // of a string.
+            $text = rtrim(preg_replace('#(^(&nbsp;|\s)+|(&nbsp;|\s)+$)#', '', $text)).t('...');
+            $text = decode_entities($text);
+            $read_more($entity_type, $entity, $text);
+          }
+        }
+        else {
+          // No break tag but the original text is longer than the trimmed text.
+          // In case we have a break tag, even in the trimmed text, we will not
+          // provide a read more link since another function will handle that
+          // for us.
+          if (strlen($item['safe_value']) != strlen($text) && strpos($text, '<!--break-->') === FALSE) {
+            $read_more($entity_type, $entity, $text);
+          }
+        }
         $element[$delta] = array('#markup' => $text);
+
+        // Add a flag on the node for adding our own "Read more" text.
+        $entity->readMoreAdded = TRUE;
       }
 
       break;
@@ -3713,4 +3782,198 @@ function os_preprocess_pager(&$variables, $hook) {
     $variables['tags'][3] = '»';
     $variables['tags'][4] = 'last';
   }
+}
+
+/**
+ * Remove missing module database entry when the
+ * module is missing from the code base
+ */
+function remove_missing_modules_entry_from_DB() {
+  $module_list = db_select('system', 's')
+    ->fields('s', array('name'))
+    ->condition('type', 'module');
+     $result = $module_list->execute();
+
+  while($record = $result->fetchAssoc()) {
+    $module = $record['name'];
+    if (!drupal_get_path('module', $module)) {
+      db_delete('system')
+        ->condition('name', $module)
+        ->condition('type', 'module')
+        ->execute();
+    }
+  }
+}
+
+/*
+ * Implements hook_metatag_pattern_alter
+ *
+ *  Ensure field_site_description is not blank (for twitter:description)
+ */
+function os_metatag_pattern_alter(&$pattern, &$types, $tag_name) {
+  // Find the empty [site:site_description] and replace with [current-page:title]
+  $site_description_token = '[site:site_description]';
+  $site_description_token_replacement = '[current-page:title]';
+  if (stristr($site_description_token, $pattern) != FALSE && empty(token_replace($site_description_token))) {
+    $pattern = $site_description_token_replacement;
+  }
+
+  // Find the empty [site:site_title], and replace with [current-page:title]
+  $site_title_token = '[site:site_title]';
+  $site_title_token_replacement = '[current-page:title]';
+  if (stristr($site_title_token, $pattern) != FALSE && empty(token_replace($site_title_token))) {
+    $pattern = $site_title_token_replacement;
+  }
+
+  // Find the best (non-empty) description string with replaced Drupal tokens
+  $field_site_description_token_str = '[node:field_site_description]';
+  $field_site_description_replacement = token_replace('[node:field_site_description]');
+  if (stristr($field_site_description_token_str, $pattern) != FALSE) {
+
+    if (($field_site_description_replacement != $field_site_description_token_str) && $field_site_description_replacement) {
+      $pattern = $field_site_description_replacement;
+      return;
+    }
+
+    if (isset($types['node'])) {
+      if ($types['node']->field_site_description[LANGUAGE_NONE][0]['safe_value']) {
+        $pattern = $types['node']->field_site_description[LANGUAGE_NONE][0]['safe_value'];
+      } else if ($types['node']->field_meta_description[LANGUAGE_NONE][0]['safe_value']) {
+        $pattern = $types['node']->field_meta_description[LANGUAGE_NONE][0]['safe_value'];
+      } else if ($types['node']->title) {
+        $pattern = $types['node']->title;
+      } else {
+        $pattern = "OpenScholar site";
+      }
+      return;
+    }
+
+    // If there is no replacement or the replacement string is blank, use the node's title
+    $title_token_str = '[node:title]';
+    $node_title_token_replacement = token_replace($title_token_str);
+    if (($node_title_token_replacement != $title_token_str) && $node_title_token_replacement) {
+      $pattern = $node_title_token_replacement;
+      return;
+    }
+
+    return;
+  }
+}
+
+ /**
+ * Implements hook_token_info().
+ * Adding new tokens [site:site_logo] and [site:site_description]
+ */
+function os_token_info() {
+
+  // Add tokens.
+  $site['site_logo'] = array(
+    'name' => t('Site Logo'),
+    'description' => t('Site Cropped Logo'),
+  );
+
+  // Add tokens.
+  $site['site_description'] = array(
+    'name' => t('Site Description'),
+    'description' => t('Site Description From Site Info Widget'),
+  );
+
+  $site['site_title'] = array(
+    'name' => t('Site Title'),
+    'description' => t('Site Title From Site Info Widget'),
+  );
+
+  return array(
+    'tokens' => array(
+      'site' => $site,
+    ),
+  );
+}
+
+/**
+ * Implements hook_tokens().
+ */
+function os_tokens($type, $tokens, array $data = array(), array $options = array()) {
+  $replacements = array();
+
+ if ($type == 'site') {
+    foreach ($tokens as $name => $original) {
+      switch ($name) {
+        case 'site_logo':
+          if (module_exists('vsite') && $vsite = spaces_get_space()) {
+            $file = field_get_items('node', $vsite->group, 'field_site_logo');
+            $file = $file[0];
+            $replacements[$original] = file_create_url($file['uri']);
+          }
+          break;
+        case 'site_description':
+          if (module_exists('vsite') && $vsite = spaces_get_space()) {
+            $desc = field_get_items('node', $vsite->group, 'field_site_description');
+            $replacements[$original] = $desc[0]['safe_value'];
+          }
+          break;
+        case 'site_title':
+          if (module_exists('vsite') && $vsite = spaces_get_space()) {
+            $title = $vsite->group->title;
+            $replacements[$original] = $title;
+          }
+          break;
+      }
+    }
+  }
+  return $replacements;
+}
+
+/**
+ * Implements hook_redirect_alter().
+ */
+function os_redirect_alter($redirect) {
+  $redirect->callback = 'os_redirect_goto';
+}
+
+/**
+ * Redirect callback; perform an URL redirect.
+ * Support fragment on url redirect.
+ * e.g - from my-content to example/my-text#fragment-name
+ * @see redirect_goto().
+ */
+function os_redirect_goto($redirect) {
+  $parse_url = drupal_parse_url($redirect->redirect);
+  $redirect->redirect_options['absolute'] = TRUE;
+  $redirect->redirect_options['fragment'] = $parse_url['fragment'];
+  $redirect->redirect_options['query'] = $parse_url['query'];
+  $url = url($parse_url['path'], $redirect->redirect_options);
+
+  drupal_add_http_header('Location', $url);
+  drupal_add_http_header('Status', redirect_status_code_options($redirect->status_code));
+
+  if (!empty($redirect->rid)) {
+    // Add a custom header for the redirect ID so when the redirect is served
+    // from the page cache, we can track it.
+    drupal_add_http_header('X-Redirect-ID', $redirect->rid);
+  }
+
+  if (!variable_get('redirect_page_cache', 0) || !variable_get('cache', 0) || !drupal_page_is_cacheable() || empty($redirect->cache)) {
+    drupal_exit($url);
+  }
+
+  // @see drupal_exit()
+  if (drupal_get_bootstrap_phase() == DRUPAL_BOOTSTRAP_FULL) {
+    if (!defined('MAINTENANCE_MODE') || MAINTENANCE_MODE != 'update') {
+      module_invoke_all('exit', $url);
+    }
+    drupal_session_commit();
+    if (variable_get('cache', 0)) {
+      // We must output something to allow the request to be cached.
+      echo ' ';
+      if ($cache = drupal_page_set_cache()) {
+        // When caching this redirect for the first time we still need to ensure
+        // that the correct cache headers are sent.
+        // @see drupal_page_footer()
+        drupal_serve_page_from_cache($cache);
+      }
+    }
+  }
+
+  exit;
 }

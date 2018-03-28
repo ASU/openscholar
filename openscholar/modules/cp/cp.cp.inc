@@ -26,7 +26,7 @@ function cp_cp_settings() {
       'group' => array(
         '#title' => t('URL Redirects'),
         '#id' => 'redirects',
-        '#help_link' => l(t('Learn more about redirects'), 'http://docs.openscholar.harvard.edu/global-site-settings#url-redirects', array('attributes' => array('target' => '_blank')))
+        '#help_link' => l(t('Learn more about redirects'), 'https://help.theopenscholar.com/global-site-settings#url-redirects', array('attributes' => array('target' => '_blank')))
       ),
       'form' => array(
         '#title' => t('Manage redirects'),
@@ -41,7 +41,7 @@ function cp_cp_settings() {
       'group' => array(
         '#title' => t('Max Redirects'),
         '#id' => 'max-redirects',
-        '#help_link' => l(t('Learn more about redirects'), 'http://docs.openscholar.harvard.edu/global-site-settings#url-redirects', array('attributes' => array('target' => '_blank')))
+        '#help_link' => l(t('Learn more about redirects'), 'https://help.theopenscholar.com/global-site-settings#url-redirects', array('attributes' => array('target' => '_blank')))
       ),
       'form' => array(
         '#type' => 'textfield',
@@ -62,9 +62,9 @@ function cp_cp_settings() {
         '#id' => 'os-maintenance',
       ),
       'form' => array(
-        '#title' => t('Site Cache'),
+        '#title' => t('Clear site cache'),
         '#type' => 'submit',
-        '#value' => t('Clear cache'),
+        '#value' => t('Submit'),
         '#description' => t('Clear the cache so website visitors see the most recent updates. This removes the normal ~15 minute delay for new/updated posts to show up, but can slow the site down for your visitors.'),
         '#submit' => array('cp_clear_site_cache'),
         '#access' => user_access('clear vsite cache'),

@@ -36,9 +36,7 @@ class os_boxes_mailchimp extends os_boxes_default {
     $api = variable_get('os_mailchimp_vsite_api_key', '');
     
     if (!$api) {
-      $form['subscribe']['api_warning'] = array(
-        '#markup' => '<div class="error messages">You have not set a <strong>MailChimp API key</strong>.  Until you do so, mailing lists will not work.  You can set up an API key in <a href="/' . $space->group->purl . '/cp/settings" target="_new">site settings</a>.</div>', '#type' => 'markup'
-      );
+	    drupal_set_message(t('You have not set a <strong>MailChimp API key</strong>.  Until you do so, mailing lists will not work.  You can set up an API key in Settings > Global Settings > Mailing List.'), 'error');
     } else {
       $form['subscribe']['list'] = array(
         '#type' => 'select', 
@@ -95,11 +93,15 @@ class os_boxes_mailchimp extends os_boxes_default {
       
       case 'mailchimp_form':
         $info = (_os_mailchimp_get_list_info(variable_get('os_mailchimp_vsite_api_key', '')));
-        if ($info['data']) {
-          foreach ($info['data'] as $list_info) {
-            if ($list_info['id'] == $this->options['list']) {
+        if ($info['lists']) {
+          foreach ($info['lists'] as $list_info) {
+            if ($list_info->id == $this->options['list']) {
+              $subscribe_url_long = $list_info->subscribe_url_long;
+              // change "manage1" or "manage2" to "manage" in domain part
+              $subscribe_url_long = str_replace(array('manage1', 'manage2'), 'manage', $subscribe_url_long);
+              $subscribe_url_long = str_replace('http://', '//', $subscribe_url_long);
               $block['content'] = t('<iframe src="@url" width="@width", height="@height"></iframe>', array(
-                '@url' => $list_info['subscribe_url_long'],
+                '@url' => $subscribe_url_long,
                 '@width' => "640px",
                 '@height' => (intval($this->options['mailchimp_iframe_height']) > 0) ? $this->options['mailchimp_iframe_height'] : $defaults['mailchimp_iframe_height'],
               ));

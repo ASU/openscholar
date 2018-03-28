@@ -219,16 +219,16 @@ function _os_publications_plain_citation($node) {
 
   if (variable_get('biblio_citeproc_style') == 'harvard-chicago-author-date.csl') {
 
-//    // Pushing day and month in those both are present in Publication for Harvard - Chicago Author cititation
-//    if (!empty($node->biblio_year) && strpos($citation, $node->biblio_date . '.') !== FALSE && !empty($node->field_biblio_pub_month['und'][0]['value'])) {
-//      // In case day value is present
-//      if(!empty($node->field_biblio_pub_day['und'][0]['value'])) {
-//        $day = $node->field_biblio_pub_day['und'][0]['value'] . '/';
-//      } else {
-//        $day = '';
-//      }
-//      $citation = str_replace($node->biblio_year . '.', $node->field_biblio_pub_month['und'][0]['value'] . '/' . $day . $node->biblio_date . '. ', $citation);
-//    }
+    // Pushing day and month in those both are present in Publication for Harvard - Chicago Author cititation
+    if (!empty($node->biblio_year) && strpos($citation, $node->biblio_date . '.') !== FALSE && !empty($node->field_biblio_pub_month['und'][0]['value'])) {
+      // In case day value is present
+      if (!empty($node->field_biblio_pub_day['und'][0]['value'])) {
+        $day = $node->field_biblio_pub_day['und'][0]['value'] . '/';
+      } else {
+        $day = '';
+      }
+      $citation = str_replace($node->biblio_year . '.', $node->field_biblio_pub_month['und'][0]['value'] . '/' . $day . $node->biblio_year . '. ', $citation);
+    }
 
     $fields = array(
       103 => array(
@@ -344,9 +344,14 @@ function theme_os_publications_export_links($variables) {
     $export_links = module_invoke_all('biblio_export_link', $nid, $filter);
     $links        = array_merge($lookup_links, $export_links);
   }
-  $title = isset($node->nid) ? t('Download Citation') : t('Download Citations');
+  $title = isset($node->nid) ? t('Download Citation') : (!isset($_REQUEST['page']) ? t('Download Citations') : '');
 
-  return theme('ctools_dropdown', array('links' => $links, 'title' => $title, 'attributes' => array('class' => array('biblio-export-buttons'))));
+  if (!empty($links)) {
+    return theme('ctools_dropdown', array('links' => $links, 'title' => $title, 'attributes' => array('class' => array('biblio-export-buttons'))));
+  }
+  else {
+    return "";
+  }
 }
 
 /**

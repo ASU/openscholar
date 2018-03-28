@@ -98,7 +98,7 @@ function os_classes_field_default_field_instances() {
         'module' => 'text',
         'settings' => array(),
         'type' => 'text_default',
-        'weight' => 0,
+        'weight' => 2,
       ),
       'links' => array(
         'label' => 'above',
@@ -118,7 +118,7 @@ function os_classes_field_default_field_instances() {
         'settings' => array(
           'trim_length' => 600,
         ),
-        'type' => 'text_summary_or_trimmed',
+        'type' => 'os_text_trimmed',
         'weight' => 3,
       ),
       'title' => array(
@@ -241,7 +241,7 @@ function os_classes_field_default_field_instances() {
           'show_repeat_rule' => 'show',
         ),
         'type' => 'date_default',
-        'weight' => 2,
+        'weight' => 1,
       ),
       'links' => array(
         'label' => 'above',
@@ -317,7 +317,7 @@ function os_classes_field_default_field_instances() {
         'module' => 'list',
         'settings' => array(),
         'type' => 'list_default',
-        'weight' => 1,
+        'weight' => 0,
       ),
       'links' => array(
         'label' => 'above',

@@ -30,7 +30,7 @@ function os_breadcrumbs_build_breadcrumbs() {
     switch($bundle) {
       case 'page':
       case 'book':
-        $links = _os_breadcrumbs_build_subsection_breadcrumb($menu_active_trail);
+        $links = _os_breadcrumbs_build_subsection_breadcrumb($menu_active_trail, $bundle);
         break;
       case 'class_material':
       case 'software_release':
@@ -318,8 +318,12 @@ function _os_breadcrumbs_build_taxonomy_breadcrumb($path) {
       $links[] = ''; // t(ucfirst($short_title));
     }else {
       $term_path = taxonomy_term_uri($term);
+      $path_alias = drupal_get_path_alias($term_path['path']);
+      $path_array = explode('/', $path_alias);
+      $child_path = array_slice($path_array, 1);
+      $term_uri = implode('/', $child_path);
       // If we are in a content type, it needs to be appended onto the breadcrumb link for consistancy.
-      $term_url = $prepend_taxonomy == TRUE ? $append_paths . '/' . $term_path['path'] : $term_path['path'];
+      $term_url = $prepend_taxonomy == TRUE ? $append_paths . '/' . $term_uri : '/'. $term_uri;
       $links[] = l(strtoupper($short_title), $term_url);
     }
   }
@@ -331,13 +335,23 @@ function _os_breadcrumbs_build_taxonomy_breadcrumb($path) {
  * @param $menu_active_trail
  *  Variable based off menu_active_trail().
  */
-function _os_breadcrumbs_build_subsection_breadcrumb($menu_active_trail) {
+function _os_breadcrumbs_build_subsection_breadcrumb($menu_active_trail, $bundle = '') {
+  if (count($menu_active_trail) > 1 && $bundle == 'book') {
+    $document_trail[] = array(
+        'title' => t('Documents'),
+        'href' => 'documents',
+        'link_path' => '',
+        'localized_options' => array(),
+        'type' => 0,
+      );
+    array_splice($menu_active_trail, 1, 0, $document_trail);
+  }
   $links = array();
   foreach($menu_active_trail as $key => $menu) {
     $short_title = _os_breadcrumbs_shorten_title($menu['title']);
     // Check for a parent menu item.
     if(_os_breadcrumbs_check_parents($menu['href']) != FALSE) {
-      $parent_links = _os_breadcrumbs_check_parents($menu['href']);
+      $parent_links = _os_breadcrumbs_check_parents($menu['href'], $max_parents = 1);
       if(isset($parent_links) && is_array($parent_links)) {
         $links = array_merge($links, $parent_links);
       }
@@ -574,7 +588,7 @@ function _os_breadcrumbs_check_custom_title($path) {
  * @params $path
  *  The path of the app.
  */
-function _os_breadcrumbs_check_parents($path) {
+function _os_breadcrumbs_check_parents($path, $max_parents = null) {
   // Load the menu file.
   ctools_include('menu','os');
 
@@ -608,6 +622,11 @@ function _os_breadcrumbs_check_parents($path) {
 
   // Flip the parent keys around.
   $parent_ids = array_reverse($parent_ids);
+
+  // Sometimes we need just one parent (so exclude grandparents, great grandparents, etc.)
+  if (isset($max_parents)) {
+    $parent_ids = array_slice($parent_ids, 0, $max_parents);
+  }
 
   foreach($parent_ids as $key => $menu_id) {
     $parent_link = vsite_menu_menu_link_load($menu_id);
